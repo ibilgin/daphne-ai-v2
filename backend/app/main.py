@@ -245,6 +245,21 @@ async def get_job_status(job_id: str) -> Any:
     )
 
 
+@app.get("/api/comics", response_model=list[ComicSchema])
+async def list_comics() -> Any:
+    r = _get_redis()
+    comic_ids = r.lrange("comic_index", 0, 49)
+    comics = []
+    for cid in comic_ids:
+        raw = r.get(f"comic:{cid}")
+        if raw:
+            try:
+                comics.append(ComicSchema.model_validate_json(raw))
+            except Exception:
+                pass
+    return comics
+
+
 @app.get("/api/comics/{comic_id}", response_model=ComicSchema)
 async def get_comic(comic_id: str) -> Any:
     """

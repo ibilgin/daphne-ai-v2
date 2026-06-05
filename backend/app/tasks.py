@@ -258,6 +258,10 @@ def generate_comic(
             comic_json = json.dumps(final_state["final_comic"])
             r.set(f"comic:{result_id}", comic_json, ex=3600)
 
+        # Maintain a library index (newest-first, capped at 50 entries)
+        r.lpush("comic_index", result_id)
+        r.ltrim("comic_index", 0, 49)
+
         _update_progress(
             r,
             job_id,

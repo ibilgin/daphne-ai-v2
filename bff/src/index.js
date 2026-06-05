@@ -63,9 +63,13 @@ app.get('/api/comics/:id/export-html', async (req, res) => {
 })
 
 // ── Proxy all other /api/* calls to FastAPI ───────────────────────────────────
+// pathFilter is set on the middleware itself rather than using app.use('/api', ...)
+// because Express strips the matched prefix before the middleware sees req.url,
+// which would forward /generate-comic instead of /api/generate-comic to FastAPI.
 const proxy = createProxyMiddleware({
   target: FASTAPI_URL,
   changeOrigin: true,
+  pathFilter: '/api',
   on: {
     error: (err, _req, res) => {
       console.error('[proxy]', err.message)
@@ -74,7 +78,7 @@ const proxy = createProxyMiddleware({
   },
 })
 
-app.use('/api', proxy)
+app.use(proxy)
 
 // ── Static serving in production ──────────────────────────────────────────────
 if (NODE_ENV === 'production') {
