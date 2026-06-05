@@ -86,6 +86,62 @@ services:
       timeout: 5s
       retries: 5
 
+  fastapi:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: daphne-fastapi
+    image: daphne-backend:latest
+    ports:
+      - "8000:8000"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      MODEL_ALIAS: Production
+      CAPTIONER_MODEL_NAME: captioner
+      STORYTELLER_MODEL_NAME: storyteller
+      MINIO_ENDPOINT_URL: http://minio:9000
+      # MINIO_ACCESS_KEY and MINIO_SECRET_KEY are injected by Vault at runtime.
+    depends_on:
+      redis:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: daphne-backend:latest
+    command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      MODEL_ALIAS: Production
+      CAPTIONER_MODEL_NAME: captioner
+      STORYTELLER_MODEL_NAME: storyteller
+      MINIO_ENDPOINT_URL: http://minio:9000
+    depends_on:
+      redis:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    deploy:
+      replicas: 2
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   minio-data:

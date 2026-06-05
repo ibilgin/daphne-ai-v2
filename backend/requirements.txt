@@ -48,5 +48,7 @@ ruff>=0.4
 fastapi>=0.111
 uvicorn[standard]>=0.29
 pydantic>=2.7
+pydantic-settings>=2.2   # Settings from env vars (config.py)
 celery>=5.4
 redis>=5.0
+prometheus-client>=0.20  # GET /metrics exposition

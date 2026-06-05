@@ -1,0 +1,23 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: celery-worker-scaledobject
+  namespace: team-comics
+  labels:
+    app.kubernetes.io/name: comic-platform
+    app.kubernetes.io/component: worker
+spec:
+  scaleTargetRef:
+    name: comic-platform-worker  # must match the Deployment name in deployment-worker.yaml
+  minReplicaCount: 1
+  maxReplicaCount: 6
+  cooldownPeriod: 60
+  pollingInterval: 10
+  triggers:
+    - type: redis
+      metadata:
+        # Redis connection — address is resolved in-cluster
+        address: redis.team-comics.svc.cluster.local:6379
+        listName: celery
+        listLength: "5"
+        # databaseIndex defaults to 0
