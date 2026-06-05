@@ -1,0 +1,39 @@
+# Secrets — never commit
+.secrets
+.env
+*.key
+vault-token
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+backend/.venv/
+*.egg-info/
+dist/
+build/
+
+# ML artifacts
+chroma_db/
+reports/
+mlruns/
+mlflow_artifacts/
+*.safetensors
+*.bin
+*.ckpt
+*.pt
+
+# Node
+node_modules/
+frontend/dist/
+bff/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
