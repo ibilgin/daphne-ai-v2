@@ -1,5 +1,3 @@
-version: "3.9"
-
 # =============================================================================
 # Sketch to Story — unified local dev stack
 #
@@ -89,7 +87,10 @@ services:
     restart: "no"
 
   mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.13.0
+    build:
+      context: ./mlflow
+      dockerfile: Dockerfile
+    image: daphne-mlflow:latest
     container_name: daphne-mlflow
     depends_on:
       postgres:
