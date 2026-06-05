@@ -53,6 +53,12 @@ class Settings(BaseSettings):
         default=5.0, alias="MIN_STD_DEVIATION"
     )  # blank-image threshold
 
+    # PostgreSQL (used by human_review node)
+    database_url: str = Field(
+        default="postgresql://postgres:postgres@localhost:5432/comicdb",
+        alias="DATABASE_URL",
+    )
+
     # CORS — comma-separated list of allowed origins
     cors_origins: str = Field(default="*", alias="CORS_ORIGINS")
 

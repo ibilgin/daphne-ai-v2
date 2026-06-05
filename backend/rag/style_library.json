@@ -1,0 +1,422 @@
+[
+  {
+    "id": "adv-01",
+    "style": "adventure",
+    "age_group": "4-6",
+    "tone": "exciting",
+    "text": "Lily put on her explorer hat and grabbed her magnifying glass. The garden was full of tiny secrets waiting to be found! She spotted a trail of crumbs leading to the flower bed."
+  },
+  {
+    "id": "adv-02",
+    "style": "adventure",
+    "age_group": "4-6",
+    "tone": "brave",
+    "text": "Sam climbed to the top of the big hill and looked all around. The whole town looked tiny from up there! He waved his flag and cheered as loud as he could."
+  },
+  {
+    "id": "adv-03",
+    "style": "adventure",
+    "age_group": "4-6",
+    "tone": "playful",
+    "text": "Mia and her dog Biscuit followed the winding path through the park. Every turn brought something new — a butterfly, a puddle, a shiny pebble. They had the best adventure right in their own neighbourhood."
+  },
+  {
+    "id": "adv-04",
+    "style": "adventure",
+    "age_group": "7-9",
+    "tone": "determined",
+    "text": "Jake studied the hand-drawn map one more time before setting off into the woods. The X marked a clearing half a mile north, past the old oak tree. He tightened his backpack straps and marched forward, ready for whatever lay ahead."
+  },
+  {
+    "id": "adv-05",
+    "style": "adventure",
+    "age_group": "7-9",
+    "tone": "thrilling",
+    "text": "The river was wider than Priya expected, but she had built the raft herself and she trusted it. She pushed off from the muddy bank and felt the current take hold. The downstream journey had begun."
+  },
+  {
+    "id": "adv-06",
+    "style": "adventure",
+    "age_group": "7-9",
+    "tone": "curious",
+    "text": "Hidden behind the waterfall was a narrow cave entrance that none of the villagers had mentioned. Marco squeezed through, torch in hand, and gasped at the crystals covering every wall. This was a discovery worth writing home about."
+  },
+  {
+    "id": "adv-07",
+    "style": "adventure",
+    "age_group": "10-12",
+    "tone": "suspenseful",
+    "text": "The compass spun uselessly as Zara entered the ancient ruins, just as the guidebook had warned. She would have to rely on her own sense of direction from here. Taking a slow breath, she memorised the position of the sun and started counting her steps."
+  },
+  {
+    "id": "adv-08",
+    "style": "adventure",
+    "age_group": "10-12",
+    "tone": "resourceful",
+    "text": "All three of their torches had gone out, but Felix noticed a faint glow coming from the lichen on the cave walls. He collected a handful and pressed it into the glass jar he always kept in his pack. Bioluminescence — nature's emergency light."
+  },
+  {
+    "id": "adv-09",
+    "style": "adventure",
+    "age_group": "10-12",
+    "tone": "triumphant",
+    "text": "After two days of trekking, Amara finally reached the summit ridge just as the clouds parted. The valley below was exactly as the explorer's journal described — a hidden lake shimmering gold in the afternoon light. She planted her flag and allowed herself one long, satisfied smile."
+  },
+  {
+    "id": "adv-10",
+    "style": "adventure",
+    "age_group": "10-12",
+    "tone": "tense",
+    "text": "The rope bridge swayed alarmingly with every step, but turning back was no longer an option. Ryo tested each plank carefully before putting his full weight on it. The other side was close — he just had to keep moving."
+  },
+  {
+    "id": "fan-01",
+    "style": "fantasy",
+    "age_group": "4-6",
+    "tone": "magical",
+    "text": "The little fairy sprinkled gold dust on every flower in the garden. Each bloom lit up like a tiny lamp in the evening air. Even the grumpy old toad had to admit it looked wonderful."
+  },
+  {
+    "id": "fan-02",
+    "style": "fantasy",
+    "age_group": "4-6",
+    "tone": "whimsical",
+    "text": "A cloud shaped exactly like a bunny floated past Bea's window. She jumped onto it and it carried her up to the rainbow meadow in the sky. The sky sheep were surprised but very pleased to have a visitor."
+  },
+  {
+    "id": "fan-03",
+    "style": "fantasy",
+    "age_group": "4-6",
+    "tone": "gentle",
+    "text": "The tiny dragon could not yet breathe fire, but she could sneeze little puffs of smoke that smelled like cinnamon. All the forest creatures loved her sneezes on cold mornings. She was the warmest friend anyone could wish for."
+  },
+  {
+    "id": "fan-04",
+    "style": "fantasy",
+    "age_group": "7-9",
+    "tone": "enchanting",
+    "text": "The spell-book opened by itself when Nia touched its silver clasp. The pages were covered in glowing letters that rearranged themselves as she read. She knew then that she had been chosen as the next keeper of stories."
+  },
+  {
+    "id": "fan-05",
+    "style": "fantasy",
+    "age_group": "7-9",
+    "tone": "adventurous",
+    "text": "Every night at exactly midnight, the library books flew off their shelves and re-told their stories aloud to one another. Ben had stayed awake to catch them at it, and now he sat in the middle of a swirling storm of pages and voices. He could not think of a better place to be."
+  },
+  {
+    "id": "fan-06",
+    "style": "fantasy",
+    "age_group": "7-9",
+    "tone": "wonder",
+    "text": "The unicorn's mane changed colour with her mood — silver when calm, violet when curious, and a deep rosy pink when she laughed. Today it flickered through all three at once as she watched the children try to catch fireflies in the meadow."
+  },
+  {
+    "id": "fan-07",
+    "style": "fantasy",
+    "age_group": "10-12",
+    "tone": "epic",
+    "text": "The ancient prophecy had spoken of a child who could hear the mountains breathe, and for three generations no one had believed it. Kel pressed her palm against the granite cliff and felt it exhale slowly, like a sleeping giant. Everything she had been told about the world was about to change."
+  },
+  {
+    "id": "fan-08",
+    "style": "fantasy",
+    "age_group": "10-12",
+    "tone": "mysterious",
+    "text": "The map showed a door at the centre of the Whispering Forest, but doors need walls and this forest had none. Theo walked in a tightening spiral, following the compass rose etched on the parchment. On his seventh circuit the air shimmered — and there it stood, a door of woven oak branches."
+  },
+  {
+    "id": "fan-09",
+    "style": "fantasy",
+    "age_group": "10-12",
+    "tone": "lyrical",
+    "text": "The Sea of Glass had not rippled in a hundred years, and the entire kingdom rested on its surface like a painting. Then Isla played a single note on her silver flute and a crack ran to every horizon. The frozen sea was singing back."
+  },
+  {
+    "id": "fan-10",
+    "style": "fantasy",
+    "age_group": "10-12",
+    "tone": "contemplative",
+    "text": "Magic, the old wizard had explained, was simply the art of paying attention until the world revealed its patterns. Ezra had thought that sounded boring until the morning he watched a spider spin its web and felt the geometry hum in his fingertips. He had his first spell before breakfast."
+  },
+  {
+    "id": "fri-01",
+    "style": "friendship",
+    "age_group": "4-6",
+    "tone": "warm",
+    "text": "Milo and Daisy always shared the biggest piece of cake, even if one of them had chosen it first. Sharing made it taste twice as nice, they both agreed. That was their number-one friendship rule."
+  },
+  {
+    "id": "fri-02",
+    "style": "friendship",
+    "age_group": "4-6",
+    "tone": "sweet",
+    "text": "When Rosie felt shy on the first day of nursery, her new friend Tom held her hand all the way to the painting table. By the time they had finished their pictures, the shyness had melted away completely. They went home with wet sleeves and wide smiles."
+  },
+  {
+    "id": "fri-03",
+    "style": "friendship",
+    "age_group": "4-6",
+    "tone": "cheerful",
+    "text": "Every Saturday morning, Noor and her best friend Jade built the tallest tower they could with their blocks. It always fell down, and they always laughed, and then they built it even taller. Some things were more fun when they didn't quite work."
+  },
+  {
+    "id": "fri-04",
+    "style": "friendship",
+    "age_group": "7-9",
+    "tone": "heartfelt",
+    "text": "When Leo broke his leg and missed the whole summer holidays, Cass cycled over every single day to tell him what he was missing. After a while he realised he wasn't really missing anything at all. The best part of summer had come to his bedroom."
+  },
+  {
+    "id": "fri-05",
+    "style": "friendship",
+    "age_group": "7-9",
+    "tone": "honest",
+    "text": "Petra was honest enough to tell Maya that her plan for the science project had a big flaw, and Maya was wise enough to listen. They reworked the whole thing together and it became something neither of them could have made alone. That was what real friends were for."
+  },
+  {
+    "id": "fri-06",
+    "style": "friendship",
+    "age_group": "7-9",
+    "tone": "loyal",
+    "text": "Everybody else laughed when Finn said he wanted to be a professional kite-maker, but his best friend Suki took out a notepad and started drawing kite designs right there. You didn't need the whole world to believe in you — just one person who really did."
+  },
+  {
+    "id": "fri-07",
+    "style": "friendship",
+    "age_group": "10-12",
+    "tone": "bittersweet",
+    "text": "The summer Hana moved away was the same summer Ellis discovered that letters could say things faces couldn't quite manage. They wrote every week for a year, and when Hana finally visited, they found they knew each other better than before. Some distances brought people closer."
+  },
+  {
+    "id": "fri-08",
+    "style": "friendship",
+    "age_group": "10-12",
+    "tone": "courageous",
+    "text": "Standing up for Javi in front of the whole class was one of the scariest things Mara had ever done, but she did it anyway. Javi never forgot it. Twenty years later he would still call her the bravest person he had ever met."
+  },
+  {
+    "id": "fri-09",
+    "style": "friendship",
+    "age_group": "10-12",
+    "tone": "reflective",
+    "text": "Nik and Sol had argued about almost everything over the years — football teams, music, what counted as a proper lunch. But whenever one of them was having a hard time, the arguments stopped and the listening began. That, they both understood, was the deeper agreement."
+  },
+  {
+    "id": "fri-10",
+    "style": "friendship",
+    "age_group": "10-12",
+    "tone": "joyful",
+    "text": "The four of them had been making up a shared story for three whole years, adding chapters whenever they met. No one could quite remember who had invented which character any more, and that felt right. The story, like the friendship, belonged to all of them."
+  },
+  {
+    "id": "mys-01",
+    "style": "mystery",
+    "age_group": "4-6",
+    "tone": "curious",
+    "text": "Someone had left muddy footprints on the kitchen floor and nobody would say who. The footprints were very small and went all the way to the biscuit tin. The biscuit tin was empty."
+  },
+  {
+    "id": "mys-02",
+    "style": "mystery",
+    "age_group": "4-6",
+    "tone": "wondering",
+    "text": "Every morning the flowers in the garden were arranged in a different pattern, and nobody could explain why. Mum said it was the wind; Dad said it was rabbits. Poppy suspected it was something much more interesting."
+  },
+  {
+    "id": "mys-03",
+    "style": "mystery",
+    "age_group": "4-6",
+    "tone": "puzzled",
+    "text": "The missing toy car turned up inside the fish tank, which was very strange because the tank lid had been shut all night. Alfie looked at the goldfish. The goldfish looked back at Alfie. Neither of them had answers."
+  },
+  {
+    "id": "mys-04",
+    "style": "mystery",
+    "age_group": "7-9",
+    "tone": "investigative",
+    "text": "Jess drew a grid on her notebook and marked every place the school cat had been spotted in the past week. The pattern was clear: he always disappeared behind the old stage curtain at three o'clock. She was going to be there waiting tomorrow."
+  },
+  {
+    "id": "mys-05",
+    "style": "mystery",
+    "age_group": "7-9",
+    "tone": "suspenseful",
+    "text": "The library had been locked for ten years, but someone had been borrowing books. The due-date stamps were fresh, and the ink was still wet. Oscar checked the return date on the top book — it was yesterday."
+  },
+  {
+    "id": "mys-06",
+    "style": "mystery",
+    "age_group": "7-9",
+    "tone": "clever",
+    "text": "Yara noticed that the thief had left the room exactly as they had found it — almost. The painting was a centimetre lower than before, and one chair had been moved three inches to the left. Somebody very careful had been in a hurry."
+  },
+  {
+    "id": "mys-07",
+    "style": "mystery",
+    "age_group": "10-12",
+    "tone": "atmospheric",
+    "text": "The old lighthouse had been automated for thirty years, so nobody could explain why the lamp room window glowed amber every Thursday at exactly ten past nine. Dani had kept a log for six weeks to be certain, and now she was. Something — or someone — was up there."
+  },
+  {
+    "id": "mys-08",
+    "style": "mystery",
+    "age_group": "10-12",
+    "tone": "analytical",
+    "text": "The coded note contained thirty-seven words but only twenty-six punctuation marks — exactly the right number to act as a second message if you substituted each mark for its corresponding letter. Phoebe had cracked it in forty minutes. The real message was far simpler than anyone expected."
+  },
+  {
+    "id": "mys-09",
+    "style": "mystery",
+    "age_group": "10-12",
+    "tone": "tense",
+    "text": "There were four people in the village who had known the old keeper's secret, and now three of them had quietly moved away in the same month. Cassius was the only one left to ask, and he hadn't answered a single question in thirty years. Today, though, he looked like a man who was finally ready to talk."
+  },
+  {
+    "id": "mys-10",
+    "style": "mystery",
+    "age_group": "10-12",
+    "tone": "deductive",
+    "text": "The footprints in the frost led to the garden gate and then simply stopped, without any tracks leading away. Leila ruled out the obvious explanations one by one until only one remained. She didn't like it, but she couldn't argue with the evidence."
+  },
+  {
+    "id": "ani-01",
+    "style": "animals",
+    "age_group": "4-6",
+    "tone": "cute",
+    "text": "The baby hedgehog couldn't decide which berry to eat first, so she tried to eat them all at once. Berries went everywhere and a robin flew down to help tidy up. They became the best of friends over a shared breakfast."
+  },
+  {
+    "id": "ani-02",
+    "style": "animals",
+    "age_group": "4-6",
+    "tone": "funny",
+    "text": "The puppy thought the mirror was another dog and barked at it for a full five minutes. The dog in the mirror barked back exactly the same. Eventually they both got tired and went for a nap."
+  },
+  {
+    "id": "ani-03",
+    "style": "animals",
+    "age_group": "4-6",
+    "tone": "gentle",
+    "text": "The mama duck led her five ducklings across the road one by one, and all the cars waited patiently. The last duckling stopped to look at a shiny puddle. The mama duck quacked gently and he remembered to keep moving."
+  },
+  {
+    "id": "ani-04",
+    "style": "animals",
+    "age_group": "7-9",
+    "tone": "educational",
+    "text": "Every autumn the swallows gathered on the telephone wire like notes on a musical score. They were getting ready for their long journey south — a flight of thousands of miles using nothing but the Earth's magnetic field to guide them. Watching them leave, Ben wished he could follow."
+  },
+  {
+    "id": "ani-05",
+    "style": "animals",
+    "age_group": "7-9",
+    "tone": "warm",
+    "text": "The old rescue cat had taken weeks to come out from under the bed, and now she sat on Chloe's lap every single evening without fail. Trust was something you couldn't rush, but once you had it, it was worth everything. Chloe stroked her ears and felt very lucky."
+  },
+  {
+    "id": "ani-06",
+    "style": "animals",
+    "age_group": "7-9",
+    "tone": "dramatic",
+    "text": "The fox kit had wandered too far from the earth and now she sat at the edge of the big meadow, uncertain which way to go. Then she heard her mother's short, sharp bark from the tree line and everything made sense again. She ran as fast as her small legs would carry her."
+  },
+  {
+    "id": "ani-07",
+    "style": "animals",
+    "age_group": "10-12",
+    "tone": "thoughtful",
+    "text": "Octopuses can solve puzzles, open jars, and recognise individual human faces, which made Lily wonder about the nature of intelligence itself. If a creature with no central brain and nine separate nervous systems could think, what did thinking really mean? She stared at the one in the tank and it stared calmly back."
+  },
+  {
+    "id": "ani-08",
+    "style": "animals",
+    "age_group": "10-12",
+    "tone": "moving",
+    "text": "The humpback whale's song could travel for hundreds of miles through the ocean, reaching other whales the singer would never meet. Scientists were still trying to decode what the songs contained, but everyone who heard them agreed they carried something enormous. Some forms of communication didn't need translation."
+  },
+  {
+    "id": "ani-09",
+    "style": "animals",
+    "age_group": "10-12",
+    "tone": "scientific",
+    "text": "Elephant herds have been observed returning to the same site year after year to mourn their dead, touching the bones gently with their trunks and standing in silence. Whether this constitutes grief in the way humans experience it remains an open question. What is certain is that they remember."
+  },
+  {
+    "id": "ani-10",
+    "style": "animals",
+    "age_group": "10-12",
+    "tone": "hopeful",
+    "text": "The rewilded river had been flowing clean for just three years, but the otters were already back — first one, then a pair, then a family with kits. Nature had kept a record of what had once been possible, and it was ready to try again the moment conditions allowed. That felt like something worth celebrating."
+  },
+  {
+    "id": "spc-01",
+    "style": "space",
+    "age_group": "4-6",
+    "tone": "wonder",
+    "text": "The little rocket zoomed past the moon and waved at the man-in-the-moon face. Then it zoomed past the sparkly rings of Saturn and waved at the rings too. The rings twinkled back like they were very pleased to have a visitor."
+  },
+  {
+    "id": "spc-02",
+    "style": "space",
+    "age_group": "4-6",
+    "tone": "cosy",
+    "text": "Cosmo the astronaut floated inside her spacecraft while the stars drifted past the window. She tucked her teddy bear into the sleeping bag beside her. Even a trillion miles from home, bedtime felt the same."
+  },
+  {
+    "id": "spc-03",
+    "style": "space",
+    "age_group": "4-6",
+    "tone": "playful",
+    "text": "The alien had six arms and used them all when it waved hello, which made it look like a very enthusiastic spider. Its spaceship was shaped like a lemon drop and smelled faintly of strawberries. It turned out aliens were much friendlier than the comic books suggested."
+  },
+  {
+    "id": "spc-04",
+    "style": "space",
+    "age_group": "7-9",
+    "tone": "exciting",
+    "text": "The first thing you noticed when you left Earth's atmosphere was the silence — a deep, total silence that no recording could properly capture. Then you saw the planet from outside for the first time, a blue-and-white marble against all that black. Tomás pressed his face to the window and didn't speak for a long time."
+  },
+  {
+    "id": "spc-05",
+    "style": "space",
+    "age_group": "7-9",
+    "tone": "curious",
+    "text": "The rover trundled across the rust-red plain, sending images back to mission control with a twenty-minute delay — because that was how long light took to travel from Mars to Earth. By the time anyone on Earth saw the pictures, the rover was already somewhere else entirely. Priya thought that was a strange kind of time travel."
+  },
+  {
+    "id": "spc-06",
+    "style": "space",
+    "age_group": "7-9",
+    "tone": "imaginative",
+    "text": "If you could fly at the speed of light it would still take you four years to reach the nearest star after our sun. Ben had worked out that four light-years was about forty trillion kilometres, which his brain couldn't really hold all at once. He settled for imagining it as a very, very long car trip."
+  },
+  {
+    "id": "spc-07",
+    "style": "space",
+    "age_group": "10-12",
+    "tone": "philosophical",
+    "text": "Every atom in your body heavier than hydrogen was forged inside a dying star that exploded billions of years before the Earth existed. You are, in a very literal sense, made of stardust — which is either the most humbling or the most inspiring thought in the universe, depending on your mood. Zara decided it was both at the same time."
+  },
+  {
+    "id": "spc-08",
+    "style": "space",
+    "age_group": "10-12",
+    "tone": "dramatic",
+    "text": "The solar sail unfurled like a silver flower opening in slow motion, catching the pressure of photons streaming from the sun. In a vacuum with no friction to fight, even that tiny push would build into real speed over months and years. The probe would reach Alpha Centauri in twenty years — long after everyone on the mission team had retired."
+  },
+  {
+    "id": "spc-09",
+    "style": "space",
+    "age_group": "10-12",
+    "tone": "eerie",
+    "text": "The signal had been repeating on the same frequency for eleven hours when Dr Okonkwo's team finally confirmed it was not terrestrial interference. It didn't match any known pulsar pattern, and it varied in a way that suggested — but did not prove — deliberate structure. They checked their equipment three times before filing the observation report."
+  },
+  {
+    "id": "spc-10",
+    "style": "space",
+    "age_group": "10-12",
+    "tone": "hopeful",
+    "text": "The first generation ship would carry ten thousand people and would take three hundred years to reach its destination, meaning no one alive at launch would ever see the new world. They were going anyway, because some journeys were worth making even if you only started them. Mei read the mission statement and understood for the first time what the word legacy really meant."
+  }
+]

@@ -16,6 +16,7 @@ build/
 
 # ML artifacts
 chroma_db/
+backend/chroma_db/
 reports/
 mlruns/
 mlflow_artifacts/

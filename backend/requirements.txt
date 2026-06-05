@@ -52,3 +52,29 @@ pydantic-settings>=2.2   # Settings from env vars (config.py)
 celery>=5.4
 redis>=5.0
 prometheus-client>=0.20  # GET /metrics exposition
+
+# ---------------------------------------------------------------------------
+# Phase 3 — RAG & Agentic Pipeline
+# ---------------------------------------------------------------------------
+# ChromaDB (persistent vector store)
+chromadb>=0.5
+
+# Sentence embeddings (local, no external API)
+sentence-transformers>=3.0
+
+# LangChain ecosystem
+langchain>=0.2
+langchain-core>=0.2
+langchain-community>=0.2  # ChatOllama
+
+# LangGraph stateful agent
+langgraph>=0.2
+
+# LangSmith local tracing
+langsmith>=0.1
+
+# Safety classifier (Detoxify — local inference)
+detoxify>=0.5
+
+# PostgreSQL client for human_review queue
+psycopg2-binary>=2.9

@@ -1,35 +1,37 @@
 """
 Celery task: generate_comic
 
-Pipeline stages and Redis progress updates:
-  10%  load_models
-  30%  caption
-  60%  retrieve_style
-  80%  generate_story
-  95%  structure_panels
-  100% save_result
+Pipeline is now driven by the LangGraph agent (Phase 3).
+Progress stages and Redis key schema remain identical to Phase 2 for
+API compatibility with GET /api/jobs/{job_id}.
+
+Stage           Progress  Node
+-----------     --------  ----
+load_models        10%    (pre-agent, model warm-up)
+caption            20%    analyse_drawing
+retrieve_style     40%    retrieve_style
+generate_story     60%    generate_panels
+check_safety       75%    check_safety
+structure_panels   90%    assemble
+save_result       100%    assemble (Redis persist)
 
 Child data privacy
 ------------------
-The raw image bytes passed to this task are NEVER written to disk or any
-persistent store.  Only the SHA-256 hash is recorded in the audit log.
-The task receives image bytes as a base64 string (to survive Celery
-serialisation); the raw bytes are reconstructed in memory only.
+Raw image bytes are never written to disk or any persistent store.
+Only the SHA-256 hash is recorded in the audit log.
+The task receives image bytes as a base64 string (Celery JSON serialisation).
 
-Redis key schema (polled by the Vue frontend via GET /api/jobs/{job_id}):
-  job:{job_id}    → JSON {"status": str, "stage": str, "progress_pct": int,
-                           "result_id": str | null, "error": str | null}
-  comic:{result_id} → JSON serialisation of ComicSchema
+Redis key schema (polled by GET /api/jobs/{job_id}):
+  job:{job_id}       → JSON {"status", "stage", "progress_pct", "result_id", "error"}
+  comic:{result_id}  → JSON serialisation of ComicSchema
 """
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
 
 import redis as redis_lib
 from celery import Celery
@@ -104,9 +106,10 @@ def generate_comic(
     image_bytes_b64: str,
     child_name: str,
     style: str,
+    age_group: str = "7-9",
 ) -> None:
     """
-    Full comic-generation pipeline.
+    Full comic-generation pipeline — driven by the LangGraph agent.
 
     Parameters
     ----------
@@ -115,9 +118,11 @@ def generate_comic(
     image_bytes_b64 : str
         Base64-encoded image bytes.  Raw bytes are never stored.
     child_name : str
-        Personalisation input.
+        Personalisation input — used in story generation.
     style : str
-        Style identifier used for RAG retrieval (Phase 3).
+        Style preference hint passed to the RAG retriever.
+    age_group : str
+        One of "4-6", "7-9", "10-12". Defaults to "7-9".
     """
     r = _get_redis()
 
@@ -128,98 +133,73 @@ def generate_comic(
     try:
         # ------------------------------------------------------------------
         # Stage 1: load_models (10%)
+        # Warm up the captioner singleton before handing off to the agent.
         # ------------------------------------------------------------------
         _update_progress(r, job_id, status="processing", stage="load_models", progress_pct=10)
 
-        from app.model_loader import get_captioner, get_storyteller
-
-        captioner = get_captioner()
-        storyteller = get_storyteller()
+        from app.model_loader import get_captioner
+        get_captioner()  # ensures the model is loaded; agent nodes use the same singleton
 
         # ------------------------------------------------------------------
-        # Stage 2: caption (30%)
+        # Build initial agent state
         # ------------------------------------------------------------------
-        _update_progress(r, job_id, status="processing", stage="caption", progress_pct=30)
+        from agent.state import ComicState
 
-        import pandas as pd
-
-        caption_result = captioner.predict(
-            pd.DataFrame([{"image_bytes": image_bytes_b64}])
-        )
-        caption: str = caption_result["caption"]
-        logger.info("generate_comic: caption=%r", caption)
+        initial_state: ComicState = {
+            "job_id": job_id,
+            "image_bytes": image_bytes_b64,
+            "child_name": child_name,
+            "age_group": age_group,
+            "style_pref": style,
+            "caption": None,
+            "style_examples": [],
+            "panels": [],
+            "safety_verdict": None,
+            "safety_failure_reason": None,
+            "retry_count": 0,
+            "final_comic": None,
+            "error": None,
+        }
 
         # ------------------------------------------------------------------
-        # Stage 3: retrieve_style (60%)
-        # Phase 3 will wire in ChromaDB; for now return empty style examples.
+        # Run the LangGraph agent (stages 2-6 are managed by node callbacks)
         # ------------------------------------------------------------------
-        _update_progress(r, job_id, status="processing", stage="retrieve_style", progress_pct=60)
+        from agent.tracing import run_agent
 
-        style_examples: list[str] = []
-        logger.debug("generate_comic: style_examples=%s (Phase 3 stub)", style_examples)
+        final_state = run_agent(initial_state)
 
         # ------------------------------------------------------------------
-        # Stage 4: generate_story (80%)
+        # Post-agent: propagate result or error to the caller
         # ------------------------------------------------------------------
-        _update_progress(r, job_id, status="processing", stage="generate_story", progress_pct=80)
-
-        import json as _json
-
-        story_result = storyteller.predict(
-            pd.DataFrame(
-                [
-                    {
-                        "caption": caption,
-                        "style_examples": _json.dumps(style_examples),
-                        "panel_count": 4,
-                    }
-                ]
+        if final_state.get("error") == "escalated_to_review":
+            _update_progress(
+                r,
+                job_id,
+                status="failed",
+                stage="human_review",
+                progress_pct=0,
+                error="Content could not be made safe — escalated to human review.",
             )
-        )
-        panels_raw: list[dict] = story_result["panels"]
+            logger.warning("generate_comic: job_id=%s escalated to human review", job_id)
+            return
 
-        # ------------------------------------------------------------------
-        # Stage 5: structure_panels (95%)
-        # ------------------------------------------------------------------
-        _update_progress(r, job_id, status="processing", stage="structure_panels", progress_pct=95)
+        if final_state.get("final_comic") is None:
+            raise RuntimeError("Agent completed but final_comic is None")
 
-        from app.schemas import ComicSchema, PageSchema, PanelSchema
+        # The assemble node already wrote comic:{result_id} to Redis.
+        # Retrieve the result_id from the completed job key.
+        raw = r.get(f"job:{job_id}")
+        if raw:
+            job_data = json.loads(raw)
+            result_id = job_data.get("result_id")
+        else:
+            result_id = None
 
-        structured_panels = [
-            PanelSchema(
-                image_bytes_b64=image_bytes_b64,  # placeholder — Phase 3 will generate per-panel art
-                caption=caption,
-                narration=p.get("narration", ""),
-                dialogue=p.get("dialogue"),
-            )
-            for p in panels_raw
-        ]
-
-        # Build a single page with all panels
-        page = PageSchema(
-            page_num=1,
-            layout=str(min(len(structured_panels), 4)),  # type: ignore[arg-type]
-            panels=structured_panels,
-        )
-
-        result_id = str(uuid.uuid4())
-        comic = ComicSchema(
-            id=result_id,
-            child_name=child_name,
-            cover_title=f"{child_name}'s Comic Adventure",
-            created_at=datetime.now(tz=timezone.utc),
-            pages=[page],
-        )
-
-        # ------------------------------------------------------------------
-        # Stage 6: save_result (100%)
-        # ------------------------------------------------------------------
-        _update_progress(r, job_id, status="processing", stage="save_result", progress_pct=95)
-
-        # Persist ComicSchema JSON to Redis (1-hour TTL)
-        # Raw image bytes survive only inside the in-memory comic object here;
-        # they are NOT separately persisted.
-        r.set(f"comic:{result_id}", comic.model_dump_json(), ex=3600)
+        if not result_id:
+            # Fallback: write comic directly if assemble skipped Redis write
+            result_id = str(uuid.uuid4())
+            comic_json = json.dumps(final_state["final_comic"])
+            r.set(f"comic:{result_id}", comic_json, ex=3600)
 
         _update_progress(
             r,
@@ -229,7 +209,9 @@ def generate_comic(
             progress_pct=100,
             result_id=result_id,
         )
-        logger.info("generate_comic: complete job_id=%s result_id=%s", job_id, result_id)
+        logger.info(
+            "generate_comic: complete job_id=%s result_id=%s", job_id, result_id
+        )
 
     except Exception as exc:  # noqa: BLE001
         logger.exception("generate_comic: FAILED job_id=%s — %s", job_id, exc)
