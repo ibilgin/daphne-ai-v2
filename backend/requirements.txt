@@ -88,3 +88,22 @@ evidently>=0.4.16,<0.5
 # Additional numpy used by drift reporter (already pulled in by torch/pandas,
 # listed explicitly so the version constraint is visible)
 # numpy already listed above via data section
+
+# ---------------------------------------------------------------------------
+# Phase 5 — Governance & Safety
+# ---------------------------------------------------------------------------
+# JWT authentication (HS256) — auth.py
+PyJWT>=2.8
+
+# HashiCorp Vault client — vault_client.py
+hvac>=2.1
+
+# Fairlearn bias audit — bias_audit.py
+fairlearn>=0.10
+
+# SQLAlchemy async support + asyncpg driver — audit_log.py
+sqlalchemy[asyncio]>=2.0
+asyncpg>=0.29
+
+# PyYAML — gate_runner.py reads governance.yaml
+pyyaml>=6.0

@@ -28,6 +28,7 @@ Redis key schema (polled by GET /api/jobs/{job_id}):
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -93,6 +94,62 @@ def _update_progress(
         "error": error,
     }
     r.set(f"job:{job_id}", json.dumps(payload), ex=3600)  # 1-hour TTL
+
+
+# ---------------------------------------------------------------------------
+# Helper: fire-and-forget audit log write
+# ---------------------------------------------------------------------------
+
+
+def _audit_job(
+    *,
+    job_id: str,
+    image_hash: str,
+    panels: list,
+    caption: str,
+    comic_json: str,
+    safety_verdict: str,
+    safety_scores: dict,
+    stage_timings: dict,
+) -> None:
+    """
+    Write one record to the comic_audit table via AuditLogger.
+
+    Runs the async call in a new event loop so it can be called from
+    the synchronous Celery task.
+
+    Privacy: only SHA-256 hashes are passed to AuditLogger.
+    Raw image bytes, caption text, story text, and child names are
+    hashed here and the originals are never stored.
+    """
+    caption_hash = hashlib.sha256(caption.encode()).hexdigest()
+    story_hash = hashlib.sha256(comic_json.encode()).hexdigest()
+
+    # Derive a stable user_id from the job_id (placeholder until JWT user_id
+    # is threaded through the task signature).
+    user_id = f"job-user:{job_id}"
+
+    try:
+        from security.audit_log import get_audit_logger
+
+        audit = get_audit_logger()
+        asyncio.run(
+            audit.log_job(
+                job_id=job_id,
+                user_id=user_id,
+                image_hash=image_hash,
+                caption_hash=caption_hash,
+                story_hash=story_hash,
+                safety_verdict=safety_verdict,
+                safety_scores=safety_scores,
+                stage_timings=stage_timings,
+                model_versions={},
+            )
+        )
+        logger.info("_audit_job: logged job_id=%s verdict=%s", job_id, safety_verdict)
+    except Exception as exc:  # noqa: BLE001
+        # Never let audit failure crash the job result delivery.
+        logger.error("_audit_job: FAILED for job_id=%s — %s", job_id, exc)
 
 
 # ---------------------------------------------------------------------------
@@ -209,6 +266,22 @@ def generate_comic(
             progress_pct=100,
             result_id=result_id,
         )
+
+        # ------------------------------------------------------------------
+        # Audit log (save_result stage)
+        # Hash all sensitive content — never store raw bytes or child name.
+        # ------------------------------------------------------------------
+        _audit_job(
+            job_id=job_id,
+            image_hash=image_hash,
+            panels=final_state.get("panels") or [],
+            caption=final_state.get("caption") or "",
+            comic_json=json.dumps(final_state.get("final_comic") or {}),
+            safety_verdict=final_state.get("safety_verdict") or "UNKNOWN",
+            safety_scores={},
+            stage_timings={},
+        )
+
         logger.info(
             "generate_comic: complete job_id=%s result_id=%s", job_id, result_id
         )
@@ -222,4 +295,16 @@ def generate_comic(
             stage="error",
             progress_pct=0,
             error=str(exc),
+        )
+        # Audit even failed jobs — pass "UNKNOWN" verdict and empty hashes
+        # so the audit table has a complete record for every job attempt.
+        _audit_job(
+            job_id=job_id,
+            image_hash=image_hash,
+            panels=[],
+            caption="",
+            comic_json="{}",
+            safety_verdict="FAIL",
+            safety_scores={},
+            stage_timings={},
         )

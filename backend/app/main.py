@@ -32,7 +32,7 @@ import uuid
 from typing import Any
 
 import redis as redis_lib
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from prometheus_client import (
@@ -47,6 +47,7 @@ from monitoring.metrics_exporter import (
     queue_depth,
     update_queue_depth,
 )
+from security.auth import TokenPayload, require_role
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +165,7 @@ async def generate_comic(
     file: UploadFile = File(..., description="Child's drawing (JPEG or PNG, max 5 MB)"),
     child_name: str = Form(..., description="Child's first name"),
     style: str = Form(..., description="Art style for the comic"),
+    _token: TokenPayload = require_role("parent"),
 ) -> Any:
     """
     Validate the uploaded drawing and enqueue a Celery comic-generation job.
@@ -258,6 +260,48 @@ async def get_comic(comic_id: str) -> Any:
         raise HTTPException(status_code=404, detail=f"Comic '{comic_id}' not found.")
 
     return ComicSchema.model_validate_json(raw)
+
+
+@app.get("/api/audit")
+async def get_audit(
+    since: str | None = None,
+    _token: TokenPayload = require_role("admin"),
+) -> Any:
+    """
+    Return flagged (FAIL verdict) audit records since the given ISO timestamp.
+
+    Requires admin role.  Returns hashes only — never raw image bytes or
+    child names.
+
+    Parameters
+    ----------
+    since:
+        ISO 8601 datetime string (e.g. ``2026-01-01T00:00:00Z``).
+        Defaults to the last 7 days if not provided.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from security.audit_log import get_audit_logger
+
+    if since:
+        try:
+            since_dt = datetime.fromisoformat(since.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid 'since' datetime format: {exc}",
+            ) from exc
+    else:
+        since_dt = datetime.now(tz=timezone.utc) - timedelta(days=7)
+
+    audit = get_audit_logger()
+    try:
+        records = await audit.query_flagged(since_dt)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("get_audit: query_flagged failed — %s", exc)
+        raise HTTPException(status_code=503, detail="Audit log unavailable.") from exc
+
+    return {"count": len(records), "records": records}
 
 
 @app.get("/metrics", response_class=PlainTextResponse)
