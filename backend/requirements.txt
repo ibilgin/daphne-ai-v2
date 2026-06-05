@@ -47,6 +47,7 @@ ruff>=0.4
 # ---------------------------------------------------------------------------
 fastapi>=0.111
 uvicorn[standard]>=0.29
+python-multipart>=0.0.9  # required by FastAPI for file/form uploads
 pydantic>=2.7
 pydantic-settings>=2.2   # Settings from env vars (config.py)
 celery>=5.4
