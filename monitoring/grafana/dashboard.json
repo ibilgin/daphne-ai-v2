@@ -1,0 +1,719 @@
+{
+  "uid": "comic-platform-dashboard",
+  "title": "Sketch to Story — ML Platform",
+  "description": "Phase 4 monitoring: drift detection, safety, pipeline latency, queue depth",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "tags": ["mlops", "sketch-to-story", "phase4"],
+  "editable": true,
+  "hideControls": false,
+  "links": [],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Caption Drift PSI",
+      "description": "Population Stability Index for caption_word_count. PSI > 0.2 triggers a retrain alert.",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-ds"
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.1
+              },
+              {
+                "color": "red",
+                "value": 0.2
+              }
+            ]
+          },
+          "unit": "none",
+          "decimals": 3,
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "ml_drift_psi{feature=\"caption_word_count\"}",
+          "legendFormat": "PSI",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Caption Drift PSI — Time Series",
+      "description": "PSI trend for caption_word_count. Horizontal threshold at 0.2.",
+      "gridPos": {
+        "h": 5,
+        "w": 18,
+        "x": 6,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-ds"
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "PSI",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "line"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.2
+              }
+            ]
+          },
+          "unit": "none",
+          "decimals": 3
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "ml_drift_psi{feature=\"caption_word_count\"}",
+          "legendFormat": "{{feature}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Safety Rejection Rate",
+      "description": "Rate of failed jobs per second (5m window). A spike here means the safety classifier is blocking content.",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-ds"
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "jobs/s",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0.1
+              }
+            ]
+          },
+          "unit": "reqps",
+          "decimals": 4
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "rate(jobs_total{status=\"failed\"}[5m])",
+          "legendFormat": "failed jobs/s",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "rate(jobs_total{status=\"complete\"}[5m])",
+          "legendFormat": "completed jobs/s",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "barchart",
+      "title": "Pipeline P99 Latency by Stage",
+      "description": "99th-percentile latency per pipeline stage over 5m window.",
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-ds"
+      },
+      "options": {
+        "orientation": "auto",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 100,
+        "barRadius": 0,
+        "groupWidth": 0.7,
+        "barWidth": 0.97,
+        "stacking": "none",
+        "fillOpacity": 80,
+        "gradientMode": "none",
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "colorByField": "stage"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "seconds (P99)",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 30
+              }
+            ]
+          },
+          "unit": "s",
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "histogram_quantile(0.99, rate(pipeline_stage_duration_seconds_bucket[5m]))",
+          "legendFormat": "{{stage}}",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "gauge",
+      "title": "Job Queue Depth",
+      "description": "Number of tasks currently waiting in the Celery Redis queue.",
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-ds"
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": ["lastNotNull"],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "minVizWidth": 75,
+        "minVizHeight": 75
+      },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 10
+              },
+              {
+                "color": "red",
+                "value": 50
+              }
+            ]
+          },
+          "unit": "short",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "queue_depth_gauge",
+          "legendFormat": "queue depth",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "heatmap",
+      "title": "Caption Word Count Distribution",
+      "description": "Heatmap of caption word count bucket fill counts. Useful for spotting distributional shifts.",
+      "gridPos": {
+        "h": 6,
+        "w": 18,
+        "x": 6,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-ds"
+      },
+      "options": {
+        "calculate": false,
+        "cellGap": 2,
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "mode": "scheme",
+          "reverse": false,
+          "scale": "exponential",
+          "scheme": "Oranges",
+          "steps": 64
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "filterValues": {
+          "le": 1e-9
+        },
+        "legend": {
+          "show": true
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "showValue": "never",
+        "tooltip": {
+          "mode": "single",
+          "showColorScale": false,
+          "yHistogram": false
+        },
+        "yAxis": {
+          "axisLabel": "word count bucket",
+          "axisPlacement": "left",
+          "reverse": false,
+          "unit": "short"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "scaleDistribution": {
+              "type": "linear"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "rate(caption_word_count_bucket[5m])",
+          "legendFormat": "{{le}}",
+          "refId": "A",
+          "format": "heatmap"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Story Vocabulary TTR (Type-Token Ratio)",
+      "description": "Placeholder for Story Vocabulary TTR — a lexical diversity metric derived from caption word count histograms. Connect to a custom metric when available.",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-ds"
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "TTR (0–1)",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 3,
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "ml_drift_psi{feature=\"caption_word_count\"} * 0 + 0.5",
+          "legendFormat": "vocabulary TTR (placeholder — wire to custom metric)",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Caption Embedding Cosine Distance",
+      "description": "Mean cosine distance between reference and production caption embeddings. Rising distance indicates semantic drift.",
+      "gridPos": {
+        "h": 6,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus-ds"
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        },
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "cosine distance",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none",
+          "decimals": 4,
+          "min": 0,
+          "max": 2
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus-ds"
+          },
+          "expr": "ml_embedding_cosine_distance",
+          "legendFormat": "embedding cosine distance",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

@@ -78,3 +78,13 @@ detoxify>=0.5
 
 # PostgreSQL client for human_review queue
 psycopg2-binary>=2.9
+
+# ---------------------------------------------------------------------------
+# Phase 4 — Monitoring & Drift Detection
+# ---------------------------------------------------------------------------
+# Evidently drift reports (pin to 0.4.x to keep JSON schema stable)
+evidently>=0.4.16,<0.5
+
+# Additional numpy used by drift reporter (already pulled in by torch/pandas,
+# listed explicitly so the version constraint is visible)
+# numpy already listed above via data section

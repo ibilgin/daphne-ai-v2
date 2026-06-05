@@ -37,34 +37,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
-    Counter,
-    Gauge,
-    Histogram,
     generate_latest,
 )
 
 from app.config import get_settings
 from app.schemas import ComicSchema, EnqueueResponseSchema, JobStatusSchema
+from monitoring.metrics_exporter import (
+    jobs_total,
+    queue_depth,
+    update_queue_depth,
+)
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Prometheus metrics
-# ---------------------------------------------------------------------------
-pipeline_duration_seconds = Histogram(
-    "pipeline_duration_seconds",
-    "Duration of each pipeline stage",
-    labelnames=["stage"],
-)
-jobs_total = Counter(
-    "jobs_total",
-    "Total number of jobs by terminal status",
-    labelnames=["status"],
-)
-queue_depth_gauge = Gauge(
-    "queue_depth_gauge",
-    "Number of tasks currently in the Celery Redis queue",
-)
+# queue_depth_gauge alias kept for backward compat with any direct references
+queue_depth_gauge = queue_depth
 
 # ---------------------------------------------------------------------------
 # FastAPI application
@@ -76,6 +63,13 @@ app = FastAPI(
 )
 
 settings = get_settings()
+
+# ---------------------------------------------------------------------------
+# Routers
+# ---------------------------------------------------------------------------
+from app.routes.hooks import router as hooks_router  # noqa: E402
+
+app.include_router(hooks_router)
 
 
 @app.on_event("startup")
@@ -271,9 +265,7 @@ async def metrics() -> PlainTextResponse:
     """Prometheus exposition endpoint."""
     # Refresh queue-depth gauge from Redis list length.
     try:
-        r = _get_redis()
-        depth = r.llen("celery")
-        queue_depth_gauge.set(depth)
+        update_queue_depth(_get_redis())
     except Exception:  # noqa: BLE001
         pass
 

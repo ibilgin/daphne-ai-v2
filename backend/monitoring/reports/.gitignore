@@ -1,0 +1,2 @@
+# Ignore generated drift reports — can be large and are regenerated at runtime
+drift_*.json
