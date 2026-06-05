@@ -1,5 +1,7 @@
 .PHONY: up up-full down build rebuild logs ps restart shell help
 
+SHELL := /bin/zsh -l
+
 # ── Target: default ────────────────────────────────────────────────────────────
 .DEFAULT_GOAL := help
 
