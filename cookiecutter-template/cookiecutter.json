@@ -1,0 +1,7 @@
+{
+  "project_name": "my-comic-platform",
+  "author": "Your Name",
+  "mlflow_port": "5001",
+  "fastapi_port": "8000",
+  "python_version": "3.11"
+}

@@ -1,0 +1,63 @@
+site_name: Sketch to Story
+site_description: AI Platform that transforms children's drawings into personalised comic books
+site_author: Sketch to Story Team
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - content.code.annotate
+    - search.suggest
+    - search.highlight
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - admonition
+  - pymdownx.details
+  - tables
+  - attr_list
+  - md_in_html
+
+nav:
+  - Home: index.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Decisions:
+          - ADR-001 BLIP-2 Captioner: architecture/decisions/ADR-001-blip2-captioner.md
+          - ADR-002 StPageFlip: architecture/decisions/ADR-002-stpageflip.md
+          - ADR-003 Feast Feature Store: architecture/decisions/ADR-003-feast-feature-store.md
+          - ADR-004 Governance YAML: architecture/decisions/ADR-004-governance-yaml.md
+  - Runbooks:
+      - Add Style to RAG: runbooks/add-style-to-rag.md
+      - Rollback Model: runbooks/rollback-model.md
+      - Read Audit Log: runbooks/read-audit-log.md
+      - Onboard New Engineer: runbooks/onboard-new-engineer.md
+  - Governance:
+      - Checklist: governance/checklist.md
+      - EU AI Act Classification: governance/ai-act-classification.md
+  - API Reference: api/reference.md

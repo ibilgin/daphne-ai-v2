@@ -1,0 +1,100 @@
+name: Model CI
+
+on:
+  push:
+    branches: [main, "phase/*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  MLFLOW_TRACKING_URI: http://localhost:{{ cookiecutter.mlflow_port }}
+  FASTAPI_PORT: {{ cookiecutter.fastapi_port }}
+
+jobs:
+  model-ci:
+    name: Model CI Pipeline
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: appdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python {{ cookiecutter.python_version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: "{{ cookiecutter.python_version }}"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv pip install --system -r requirements.txt
+
+      - name: Lint
+        run: |
+          pip install ruff
+          ruff check src/ tests/
+
+      - name: Unit tests
+        run: pytest tests/ -v --tb=short
+
+      - name: Evaluate captioner
+        run: python3 src/eval/captioner_eval.py
+
+      - name: Governance gate runner
+        run: |
+          python3 governance/gate_runner.py
+          echo "Governance gate passed"
+
+      - name: Register model to MLflow
+        if: github.ref == 'refs/heads/main'
+        run: python3 scripts/register_model.py
+        env:
+          MLFLOW_TRACKING_URI: ${{ "{{" }} secrets.MLFLOW_TRACKING_URI {{ "}}" }}
+
+      - name: Canary check
+        if: github.ref == 'refs/heads/main'
+        run: python3 scripts/canary_check.py
+
+  rollback:
+    name: Rollback
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'rollback'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "{{ cookiecutter.python_version }}"
+
+      - name: Install dependencies
+        run: pip install mlflow
+
+      - name: Rollback Production alias
+        run: python3 scripts/rollback_model.py
+        env:
+          MLFLOW_TRACKING_URI: ${{ "{{" }} secrets.MLFLOW_TRACKING_URI {{ "}}" }}
+          MODEL_NAME: ${{ "{{" }} github.event.inputs.model_name {{ "}}" }}
