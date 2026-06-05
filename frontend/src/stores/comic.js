@@ -1,9 +1,9 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
-})
+// Empty baseURL — all /api/* requests are relative to the current origin
+// and are intercepted by the Vite dev-server proxy (or BFF in production).
+const api = axios.create({ baseURL: '' })
 
 const POLL_INTERVAL_MS = 2000
 const POLL_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes

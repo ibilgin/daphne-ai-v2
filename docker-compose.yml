@@ -227,7 +227,7 @@ services:
     ports:
       - "5173:5173"
     environment:
-      VITE_API_URL: http://bff:3001  # server-side proxy target (container network)
+      API_PROXY_TARGET: http://bff:3001  # Vite server-side proxy target (not embedded in client bundle)
     volumes:
       - ./frontend/src:/app/src      # hot reload
       - ./frontend/index.html:/app/index.html
