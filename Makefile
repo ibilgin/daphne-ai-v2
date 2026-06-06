@@ -65,7 +65,11 @@ shell: ## Open a shell in a container: make shell s=fastapi
 
 seed: ## Register stub pyfunc models in MLflow so the UI works without real weights
 	docker cp backend/scripts/seed_dev_models.py daphne-fastapi:/app/scripts/seed_dev_models.py
-	docker compose exec fastapi python scripts/seed_dev_models.py
+	docker compose exec \
+		-e AWS_ACCESS_KEY_ID=$${MINIO_ACCESS_KEY:-minioadmin} \
+		-e AWS_SECRET_ACCESS_KEY=$${MINIO_SECRET_KEY:-minioadmin} \
+		-e MLFLOW_S3_ENDPOINT_URL=http://minio:9000 \
+		fastapi python scripts/seed_dev_models.py
 	docker compose restart fastapi celery-worker
 
 # ── Help ───────────────────────────────────────────────────────────────────────
