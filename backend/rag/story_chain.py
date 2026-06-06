@@ -40,7 +40,7 @@ _SYSTEM_PROMPT = (
     "(a short character quote, or null if none). "
     "Keep all content child-friendly — no violence, fear, or adult themes. "
     "Respond ONLY with a JSON object in this exact format: "
-    '{"panels": [{"panel": 1, "narration": "...", "dialogue": "..."}, ...]}'
+    '{{"panels": [{{"panel": 1, "narration": "...", "dialogue": "..."}}, ...]}}'
 )
 
 
