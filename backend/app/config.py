@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     # CORS — comma-separated list of allowed origins
     cors_origins: str = Field(default="*", alias="CORS_ORIGINS")
 
-    model_config = {"env_file": ".env", "populate_by_name": True}
+    model_config = {"env_file": ".env", "populate_by_name": True, "extra": "ignore"}
 
 
 _settings: Settings | None = None

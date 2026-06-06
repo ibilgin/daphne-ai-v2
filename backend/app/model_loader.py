@@ -49,9 +49,27 @@ class _DirectPanelImageGen:
         return self._impl.predict(None, data)
 
 
+def _inject_minio_credentials() -> None:
+    """
+    Push MinIO credentials from Settings into os.environ so boto3 finds them.
+
+    pydantic-settings reads .env into the Settings object but does NOT write
+    values back to os.environ.  boto3 (used by MLflow's S3 artifact store) reads
+    os.environ directly, so the bridge must be explicit.
+
+    Uses setdefault so that values already in the real environment take priority.
+    """
+    settings = get_settings()
+    if settings.minio_access_key:
+        os.environ.setdefault("AWS_ACCESS_KEY_ID", settings.minio_access_key)
+        os.environ.setdefault("AWS_SECRET_ACCESS_KEY", settings.minio_secret_key)
+        os.environ.setdefault("MLFLOW_S3_ENDPOINT_URL", settings.minio_endpoint_url)
+
+
 def _load_with_retry(model_name: str, alias: str, max_retries: int = 3) -> Any:
     """Load an MLflow pyfunc model by registered-model alias, retrying on failure."""
     settings = get_settings()
+    _inject_minio_credentials()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 
     uri = f"models:/{model_name}@{alias}"
