@@ -225,7 +225,7 @@ def run_bias_audit(
         # Per-group summary
         print("\nBias Audit Results — Fairlearn MetricFrame")
         print("=" * 50)
-        print(f"Metric: METEOR score by age_group")
+        print("Metric: METEOR score by age_group")
         print(mf.by_groups.to_string())
         print(f"\nDemographic parity difference: {dpd:.4f}")
         print(f"Threshold: <= {_MAX_DEMOGRAPHIC_PARITY_DIFF}")

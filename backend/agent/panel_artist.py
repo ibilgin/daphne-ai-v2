@@ -30,7 +30,6 @@ from __future__ import annotations
 import base64
 import io
 import math
-import random
 from typing import Any
 
 # ---------------------------------------------------------------------------
@@ -451,7 +450,6 @@ def draw_panel_image(narration: str, panel_num: int, style: str = "adventure") -
     draw.rectangle([0, _GROUND_Y, _W, _H], fill=palette["ground"])
 
     # Grass tufts
-    acc = palette["accents"]
     grass_color = tuple(min(255, c + 30) for c in palette["ground"])
     for gx in range(0, _W, 18):
         gy = _GROUND_Y - 2

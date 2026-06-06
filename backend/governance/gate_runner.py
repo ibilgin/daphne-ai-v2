@@ -38,7 +38,7 @@ def _load_yaml(path: Path) -> dict:
     """Load YAML, falling back to a helpful error if PyYAML is missing."""
     try:
         import yaml
-    except ImportError as exc:
+    except ImportError:
         print(
             "ERROR: PyYAML is not installed. "
             "Run: uv pip install pyyaml",

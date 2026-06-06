@@ -16,12 +16,8 @@ and score only.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
-
-if TYPE_CHECKING:
-    from app.schemas import PanelSchema
 
 logger = logging.getLogger(__name__)
 
