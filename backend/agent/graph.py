@@ -30,6 +30,7 @@ from agent.nodes import (
     analyse_drawing,
     assemble,
     check_safety,
+    generate_panel_images,
     generate_panels,
     human_review,
     retrieve_style,
@@ -41,12 +42,13 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Node name constants — single source of truth to avoid string typos
 # ---------------------------------------------------------------------------
-_ANALYSE = "analyse_drawing"
+_ANALYSE  = "analyse_drawing"
 _RETRIEVE = "retrieve_style"
 _GENERATE = "generate_panels"
-_SAFETY = "check_safety"
+_DRAW     = "generate_panel_images"
+_SAFETY   = "check_safety"
 _ASSEMBLE = "assemble"
-_REVIEW = "human_review"
+_REVIEW   = "human_review"
 
 # ---------------------------------------------------------------------------
 # Safety routing function
@@ -94,27 +96,31 @@ def _build_graph() -> StateGraph:
     builder = StateGraph(ComicState)
 
     # Add all nodes
-    builder.add_node(_ANALYSE, analyse_drawing)
+    builder.add_node(_ANALYSE,  analyse_drawing)
     builder.add_node(_RETRIEVE, retrieve_style)
     builder.add_node(_GENERATE, generate_panels)
-    builder.add_node(_SAFETY, check_safety)
+    builder.add_node(_DRAW,     generate_panel_images)
+    builder.add_node(_SAFETY,   check_safety)
     builder.add_node(_ASSEMBLE, assemble)
-    builder.add_node(_REVIEW, human_review)
+    builder.add_node(_REVIEW,   human_review)
 
     # Linear edges
-    builder.add_edge(START, _ANALYSE)
-    builder.add_edge(_ANALYSE, _RETRIEVE)
+    builder.add_edge(START,     _ANALYSE)
+    builder.add_edge(_ANALYSE,  _RETRIEVE)
     builder.add_edge(_RETRIEVE, _GENERATE)
-    builder.add_edge(_GENERATE, _SAFETY)
+    builder.add_edge(_GENERATE, _DRAW)      # draw images for each panel
+    builder.add_edge(_DRAW,     _SAFETY)
 
     # Conditional edge from check_safety
+    # On safety FAIL the retry loops back to generate_panels so new text
+    # and new images are both regenerated together.
     builder.add_conditional_edges(
         _SAFETY,
         _route_safety,
         {
             _ASSEMBLE: _ASSEMBLE,
             _GENERATE: _GENERATE,
-            _REVIEW: _REVIEW,
+            _REVIEW:   _REVIEW,
         },
     )
 

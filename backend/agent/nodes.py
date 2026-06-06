@@ -176,6 +176,48 @@ def generate_panels(state: ComicState) -> ComicState:
 
 
 # ===========================================================================
+# Node: generate_panel_images
+# ===========================================================================
+
+
+def generate_panel_images(state: ComicState) -> ComicState:
+    """
+    Create a child-drawing-style illustration for every panel.
+
+    Reads state["panels"] (list of dicts with narration/dialogue).
+    Adds "image_bytes_b64" to each panel dict so the assemble node can
+    pass a unique image to PanelSchema for every panel.
+
+    Uses agent.panel_artist — PIL-based renderer that picks scene elements
+    from narration keywords and style preference.  In production, swap
+    panel_artist for a diffusion model registered in MLflow under
+    "panel_image_gen@Production".
+    """
+    _update_redis_progress(state["job_id"], "draw_panels", 70)
+
+    panels: list[dict] = state.get("panels") or []
+    style: str = state.get("style_pref", "adventure")
+
+    from agent.panel_artist import draw_panel_image
+
+    enriched = []
+    for i, panel in enumerate(panels):
+        narration = panel.get("narration", "")
+        logger.info(
+            "generate_panel_images: job_id=%s panel=%d narration=%r",
+            state["job_id"], i + 1, narration[:60],
+        )
+        image_b64 = draw_panel_image(narration=narration, panel_num=i, style=style)
+        enriched.append({**panel, "image_bytes_b64": image_b64})
+
+    logger.info(
+        "generate_panel_images: job_id=%s drew %d panel images",
+        state["job_id"], len(enriched),
+    )
+    return {**state, "panels": enriched}
+
+
+# ===========================================================================
 # Node: check_safety
 # ===========================================================================
 
@@ -278,7 +320,8 @@ def assemble(state: ComicState) -> ComicState:
 
     structured_panels = [
         PanelSchema(
-            image_bytes_b64=image_b64,   # placeholder — per-panel art in Phase 4+
+            # Use the per-panel generated drawing; fall back to original if absent
+            image_bytes_b64=p.get("image_bytes_b64") or image_b64,
             caption=caption,
             narration=p.get("narration", ""),
             dialogue=p.get("dialogue"),
