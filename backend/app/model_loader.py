@@ -76,16 +76,16 @@ def load_all_models() -> None:
 
 
 def get_captioner() -> Any:
-    """Return the loaded captioner singleton.  Raises if not yet loaded."""
+    """Return the captioner singleton, loading it on first call if needed."""
+    global _captioner
     if _captioner is None:
-        raise RuntimeError("Captioner model not loaded. Call load_all_models() first.")
+        load_all_models()
     return _captioner
 
 
 def get_storyteller() -> Any:
-    """Return the loaded storyteller singleton.  Raises if not yet loaded."""
+    """Return the storyteller singleton, loading it on first call if needed."""
+    global _storyteller
     if _storyteller is None:
-        raise RuntimeError(
-            "Storyteller model not loaded. Call load_all_models() first."
-        )
+        load_all_models()
     return _storyteller
