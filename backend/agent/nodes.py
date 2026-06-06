@@ -180,21 +180,23 @@ def generate_panels(state: ComicState) -> ComicState:
 
 def generate_panel_images(state: ComicState) -> ComicState:
     """
-    Create a child-drawing-style illustration for every panel.
+    Derive a panel illustration from the child's original drawing for every panel.
 
-    Reads state["panels"] (list of dicts with narration/dialogue).
+    Reads state["image_bytes"] (the seed drawing, base64) and state["panels"].
     Adds "image_bytes_b64" to each panel dict so the assemble node can
     pass a unique image to PanelSchema for every panel.
 
-    Uses agent.panel_artist — PIL-based renderer that picks scene elements
-    from narration keywords and style preference.  In production, swap
-    panel_artist for a diffusion model registered in MLflow under
-    "panel_image_gen@Production".
+    Uses agent.panel_artist — applies pencil-sketch + narrative mood tint +
+    per-panel progressive zoom so each frame looks like the original drawing
+    reimagined at that story moment.  Swap panel_artist for a diffusion
+    img2img model registered in MLflow under "panel_image_gen@Production"
+    for higher-fidelity output without changing this node.
     """
     _update_redis_progress(state["job_id"], "draw_panels", 70)
 
     panels: list[dict] = state.get("panels") or []
     style: str = state.get("style_pref", "adventure")
+    seed_image_b64: str = state.get("image_bytes", "")
 
     from agent.panel_artist import draw_panel_image
 
@@ -205,7 +207,12 @@ def generate_panel_images(state: ComicState) -> ComicState:
             "generate_panel_images: job_id=%s panel=%d narration=%r",
             state["job_id"], i + 1, narration[:60],
         )
-        image_b64 = draw_panel_image(narration=narration, panel_num=i, style=style)
+        image_b64 = draw_panel_image(
+            seed_image_b64=seed_image_b64,
+            narration=narration,
+            panel_num=i,
+            style=style,
+        )
         enriched.append({**panel, "image_bytes_b64": image_b64})
 
     logger.info(
