@@ -23,6 +23,7 @@ networks:
 volumes:
   postgres-data:
   minio-data:
+  chroma-db:
   prometheus-data:
   alertmanager-data:
   grafana-data:
@@ -139,6 +140,8 @@ services:
     image: daphne-backend:latest
     ports:
       - "8000:8000"
+    volumes:
+      - chroma-db:/app/chroma_db
     environment:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
@@ -179,6 +182,8 @@ services:
     image: daphne-backend:latest
     container_name: daphne-celery
     command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
+    volumes:
+      - chroma-db:/app/chroma_db
     environment:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0

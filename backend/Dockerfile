@@ -50,6 +50,9 @@ WORKDIR /app
 # Copy application source.
 COPY . .
 
+# Pre-create writable directories for non-root user.
+RUN mkdir -p /app/chroma_db && chown -R appuser:appgroup /app/chroma_db
+
 # Switch to non-root user.
 USER appuser
 
