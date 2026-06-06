@@ -41,6 +41,7 @@ COPY --from=builder /opt/venv /opt/venv
 
 # Make the venv the active Python environment.
 ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH=/app \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
