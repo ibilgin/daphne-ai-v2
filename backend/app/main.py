@@ -47,7 +47,7 @@ from monitoring.metrics_exporter import (
     queue_depth,
     update_queue_depth,
 )
-from security.auth import TokenPayload, require_role
+from security.auth import TokenPayload, create_token, require_role
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +158,17 @@ def _validate_image(file_bytes: bytes, content_type: str | None) -> None:
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+
+
+@app.post("/api/auth/token")
+async def dev_token() -> dict[str, str]:
+    """Issue a short-lived parent-role JWT for local dev (ENABLE_TOKEN_CREATION=true only)."""
+    import os
+    if os.environ.get("ENABLE_TOKEN_CREATION", "").lower() not in {"1", "true", "yes"}:
+        raise HTTPException(status_code=403, detail="Token creation is disabled.")
+    from security.auth import _get_jwt_secret
+    token = create_token("dev-user", "parent", _get_jwt_secret(), expires_hours=24)
+    return {"access_token": token, "token_type": "bearer"}
 
 
 @app.post("/api/generate-comic", response_model=EnqueueResponseSchema, status_code=202)

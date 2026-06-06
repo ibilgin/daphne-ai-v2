@@ -5,6 +5,22 @@ import axios from 'axios'
 // and are intercepted by the Vite dev-server proxy (or BFF in production).
 const api = axios.create({ baseURL: '' })
 
+// Fetch a dev token once and attach it to every subsequent request.
+// In production replace this with a real login flow.
+let _tokenPromise = null
+function ensureToken() {
+  if (!_tokenPromise) {
+    _tokenPromise = axios.post('/api/auth/token')
+      .then(r => {
+        api.defaults.headers.common['Authorization'] = `Bearer ${r.data.access_token}`
+      })
+      .catch(() => {
+        _tokenPromise = null // retry on next call if it failed
+      })
+  }
+  return _tokenPromise
+}
+
 const POLL_INTERVAL_MS = 2000
 const POLL_TIMEOUT_MS = 10 * 60 * 1000 // 10 minutes
 
@@ -17,17 +33,20 @@ export const useComicStore = defineStore('comic', {
 
   actions: {
     async fetchLibrary() {
+      await ensureToken()
       const response = await api.get('/api/comics')
       this.library = response.data
     },
 
     async fetchComic(id) {
+      await ensureToken()
       const response = await api.get(`/api/comics/${id}`)
       this.currentComic = response.data
       return this.currentComic
     },
 
     async submitDrawing(formData) {
+      await ensureToken()
       const response = await api.post('/api/generate-comic', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
