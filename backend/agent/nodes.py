@@ -139,11 +139,14 @@ def retrieve_style(state: ComicState) -> ComicState:
 
 def generate_panels(state: ComicState) -> ComicState:
     """
-    Call the LangChain story chain to generate comic panel narration.
+    Call the LangChain story chain to generate (or rewrite) comic panel narration.
 
-    If this is a retry after a safety failure, the safety_failure_reason is
-    passed into the prompt so the model can avoid the problematic content.
-    Sets state["panels"] as a list of panel dicts.
+    Two paths:
+    - rough_narrative provided → rewrite the child's story into 4 storybook panels
+    - no rough_narrative → generate a story from the image caption
+
+    On safety retry the failure reason is forwarded so the model avoids the
+    problematic content.
     """
     _update_redis_progress(state["job_id"], "generate_story", 60)
 
@@ -151,8 +154,14 @@ def generate_panels(state: ComicState) -> ComicState:
     style_examples = state.get("style_examples") or []
     child_name = state.get("child_name", "the child")
     safety_failure_reason = state.get("safety_failure_reason")
+    rough_narrative = state.get("rough_narrative") or ""
 
-    if safety_failure_reason:
+    if rough_narrative.strip():
+        logger.info(
+            "generate_panels: job_id=%s narrative-rewrite path (%d chars)",
+            state["job_id"], len(rough_narrative),
+        )
+    elif safety_failure_reason:
         logger.info(
             "generate_panels: job_id=%s retry with safety augmentation — %s",
             state["job_id"],
@@ -167,6 +176,7 @@ def generate_panels(state: ComicState) -> ComicState:
         child_name=child_name,
         panel_count=4,
         safety_failure_reason=safety_failure_reason,
+        rough_narrative=rough_narrative,
     )
     logger.info("generate_panels: job_id=%s generated %d panels", state["job_id"], len(panels))
 
@@ -180,17 +190,18 @@ def generate_panels(state: ComicState) -> ComicState:
 
 def generate_panel_images(state: ComicState) -> ComicState:
     """
-    Derive a panel illustration from the child's original drawing for every panel.
+    Generate a panel illustration for every panel using the img2img model.
 
-    Reads state["image_bytes"] (the seed drawing, base64) and state["panels"].
-    Adds "image_bytes_b64" to each panel dict so the assemble node can
-    pass a unique image to PanelSchema for every panel.
+    Reads state["image_bytes"] (seed drawing, base64) and state["panels"].
+    Calls the panel_image_gen MLflow model which:
+      - "stability" backend → Stability AI /control/sketch (best quality)
+      - "hf_api"    backend → HuggingFace Inference API img2img
+      - "pil"       backend → PIL pencil-sketch + mood tint (fallback)
 
-    Uses agent.panel_artist — applies pencil-sketch + narrative mood tint +
-    per-panel progressive zoom so each frame looks like the original drawing
-    reimagined at that story moment.  Swap panel_artist for a diffusion
-    img2img model registered in MLflow under "panel_image_gen@Production"
-    for higher-fidelity output without changing this node.
+    Backend is selected via PANEL_IMG_GEN_BACKEND env var.  If the MLflow
+    model is not yet registered the PIL fallback is used automatically.
+
+    Adds "image_bytes_b64" to each panel dict for the assemble node.
     """
     _update_redis_progress(state["job_id"], "draw_panels", 70)
 
@@ -198,21 +209,37 @@ def generate_panel_images(state: ComicState) -> ComicState:
     style: str = state.get("style_pref", "adventure")
     seed_image_b64: str = state.get("image_bytes", "")
 
-    from agent.panel_artist import draw_panel_image
+    from app.model_loader import get_panel_image_gen
+
+    panel_gen = get_panel_image_gen()
 
     enriched = []
     for i, panel in enumerate(panels):
         narration = panel.get("narration", "")
         logger.info(
-            "generate_panel_images: job_id=%s panel=%d narration=%r",
-            state["job_id"], i + 1, narration[:60],
+            "generate_panel_images: job_id=%s panel=%d backend=%s narration=%r",
+            state["job_id"], i + 1,
+            "mlflow" if panel_gen else "pil-fallback",
+            narration[:60],
         )
-        image_b64 = draw_panel_image(
-            seed_image_b64=seed_image_b64,
-            narration=narration,
-            panel_num=i,
-            style=style,
-        )
+
+        if panel_gen is not None:
+            import pandas as pd  # noqa: PLC0415
+            result = panel_gen.predict(pd.DataFrame([{
+                "seed_image_b64": seed_image_b64,
+                "narration": narration,
+                "panel_num": i,
+                "style": style,
+            }]))
+            image_b64 = result.get("image_b64", "") if isinstance(result, dict) else ""
+        else:
+            from agent.panel_artist import draw_panel_image  # noqa: PLC0415
+            image_b64 = draw_panel_image(seed_image_b64, narration, i, style)
+
+        if not image_b64:
+            from agent.panel_artist import draw_panel_image  # noqa: PLC0415
+            image_b64 = draw_panel_image(seed_image_b64, narration, i, style)
+
         enriched.append({**panel, "image_bytes_b64": image_b64})
 
     logger.info(

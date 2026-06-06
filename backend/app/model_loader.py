@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 _captioner: Any = None
 _storyteller: Any = None
+_panel_image_gen: Any = None
 
 
 def _load_with_retry(model_name: str, alias: str, max_retries: int = 3) -> Any:
@@ -65,13 +66,25 @@ def _load_with_retry(model_name: str, alias: str, max_retries: int = 3) -> Any:
 
 
 def load_all_models() -> None:
-    """Load both models into module-level singletons.  Call once at startup."""
-    global _captioner, _storyteller
+    """Load all models into module-level singletons.  Call once at startup."""
+    global _captioner, _storyteller, _panel_image_gen
     settings = get_settings()
     alias = settings.model_alias
 
     _captioner = _load_with_retry(settings.captioner_model_name, alias)
     _storyteller = _load_with_retry(settings.storyteller_model_name, alias)
+
+    # panel_image_gen is optional — skip gracefully if not yet registered.
+    try:
+        _panel_image_gen = _load_with_retry("panel_image_gen", alias, max_retries=1)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "model_loader: panel_image_gen not found in registry (%s) — "
+            "PIL fallback will be used. Run `make seed` to register the stub.",
+            exc,
+        )
+        _panel_image_gen = None
+
     logger.info("model_loader: all models ready")
 
 
@@ -89,3 +102,16 @@ def get_storyteller() -> Any:
     if _storyteller is None:
         load_all_models()
     return _storyteller
+
+
+def get_panel_image_gen() -> Any | None:
+    """
+    Return the panel_image_gen singleton, or None if not registered.
+
+    The generate_panel_images node calls this and falls back to the PIL
+    panel_artist when None is returned (e.g. during first-run before seeding).
+    """
+    global _panel_image_gen, _captioner
+    if _captioner is None:
+        load_all_models()
+    return _panel_image_gen

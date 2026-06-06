@@ -164,6 +164,7 @@ def generate_comic(
     child_name: str,
     style: str,
     age_group: str = "7-9",
+    rough_narrative: str = "",
 ) -> None:
     """
     Full comic-generation pipeline — driven by the LangGraph agent.
@@ -180,12 +181,17 @@ def generate_comic(
         Style preference hint passed to the RAG retriever.
     age_group : str
         One of "4-6", "7-9", "10-12". Defaults to "7-9".
+    rough_narrative : str
+        Optional child-authored story idea.  When provided, the LLM rewrites it
+        into storybook panels instead of generating from the image caption.
+        Never stored raw — only the SHA-256 hash is written to the audit log.
     """
     r = _get_redis()
 
     # Audit: SHA-256 hash only — never log or store raw bytes.
     image_hash = hashlib.sha256(image_bytes_b64.encode()).hexdigest()
-    logger.info("generate_comic: job_id=%s image_hash=%s", job_id, image_hash)
+    logger.info("generate_comic: job_id=%s image_hash=%s has_narrative=%s",
+                job_id, image_hash, bool(rough_narrative.strip()))
 
     try:
         # ------------------------------------------------------------------
@@ -208,6 +214,7 @@ def generate_comic(
             "child_name": child_name,
             "age_group": age_group,
             "style_pref": style,
+            "rough_narrative": rough_narrative,
             "caption": None,
             "style_examples": [],
             "panels": [],

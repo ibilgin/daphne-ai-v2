@@ -79,6 +79,26 @@
                 </div>
               </div>
 
+              <div class="field narrative-field">
+                <label for="roughNarrative">
+                  Story idea
+                  <span class="field-optional">(optional)</span>
+                </label>
+                <Textarea
+                  id="roughNarrative"
+                  v-model="form.roughNarrative"
+                  :maxlength="2000"
+                  rows="4"
+                  placeholder="Let your child describe what happens in their drawing — the AI will turn it into a storybook adventure!"
+                  class="w-full"
+                  auto-resize
+                />
+                <span class="field-hint">
+                  {{ form.roughNarrative.length }}/2000 characters.
+                  When provided, the AI rewrites your child's words in storybook style.
+                </span>
+              </div>
+
               <div class="step-actions">
                 <Button
                   label="Next: Choose Style"
@@ -165,6 +185,7 @@ import StepPanels from 'primevue/steppanels'
 import StepPanel from 'primevue/steppanel'
 import FileUpload from 'primevue/fileupload'
 import InputText from 'primevue/inputtext'
+import Textarea from 'primevue/textarea'
 import Select from 'primevue/select'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
@@ -185,6 +206,7 @@ const form = ref({
   ageGroup: '',
   style: '',
   file: null,
+  roughNarrative: '',
 })
 
 const ageGroups = [
@@ -251,6 +273,9 @@ async function submitForm() {
     fd.append('child_name', form.value.childName.trim())
     fd.append('age_group', form.value.ageGroup)
     fd.append('style', form.value.style)
+    if (form.value.roughNarrative.trim()) {
+      fd.append('rough_narrative', form.value.roughNarrative.trim().slice(0, 2000))
+    }
 
     await store.submitDrawing(fd)
     activeStep.value = '3'
@@ -415,6 +440,23 @@ function onJobFailed(message) {
   gap: 0.75rem;
   padding-top: 1rem;
   border-top: 1px solid var(--p-surface-200);
+}
+
+.narrative-field {
+  min-width: 100%;
+}
+
+.field-optional {
+  font-weight: 400;
+  font-size: 0.8rem;
+  color: var(--p-text-muted-color);
+  margin-left: 0.25rem;
+}
+
+.field-hint {
+  font-size: 0.78rem;
+  color: var(--p-text-muted-color);
+  margin-top: 0.25rem;
 }
 
 .no-job {
