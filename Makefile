@@ -63,6 +63,10 @@ restart: ## Restart a service: make restart s=fastapi
 shell: ## Open a shell in a container: make shell s=fastapi
 	docker compose exec $(s) sh
 
+rag-index: ## Build (or rebuild) the ChromaDB style index inside the celery-worker container
+	docker compose exec celery-worker python -m rag.indexer
+	@echo "RAG index built. Restart celery-worker to use it: docker compose restart celery-worker"
+
 seed: ## Register stub pyfunc models in MLflow so the UI works without real weights
 	docker cp backend/scripts/seed_dev_models.py daphne-fastapi:/app/scripts/seed_dev_models.py
 	docker compose exec \

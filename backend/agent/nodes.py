@@ -113,17 +113,23 @@ def retrieve_style(state: ComicState) -> ComicState:
     caption = state.get("caption") or ""
     age_group = state.get("age_group", "7-9")
 
-    from rag.retriever import StyleRetriever
+    try:
+        from rag.retriever import StyleRetriever
 
-    retriever = StyleRetriever()
-    examples = retriever.retrieve(caption=caption, age_group=age_group, top_k=3)
-    style_texts = [ex.text for ex in examples]
-    logger.info(
-        "retrieve_style: job_id=%s retrieved %d examples styles=%s",
-        state["job_id"],
-        len(examples),
-        [ex.style for ex in examples],
-    )
+        retriever = StyleRetriever()
+        examples = retriever.retrieve(caption=caption, age_group=age_group, top_k=3)
+        style_texts = [ex.text for ex in examples]
+        logger.info(
+            "retrieve_style: job_id=%s retrieved %d examples styles=%s",
+            state["job_id"],
+            len(examples),
+            [ex.style for ex in examples],
+        )
+    except Exception as exc:  # noqa: BLE001
+        # ChromaDB index not yet built — continue without style examples.
+        # Run `make rag-index` to populate the index.
+        logger.warning("retrieve_style: RAG unavailable (%s) — continuing without examples", exc)
+        style_texts = []
 
     return {**state, "style_examples": style_texts}
 
