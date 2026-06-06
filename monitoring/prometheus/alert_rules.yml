@@ -1,0 +1,67 @@
+groups:
+  - name: comic_platform_drift
+    interval: 60s
+    rules:
+      - alert: CaptionDriftHigh
+        expr: ml_drift_psi{feature="caption_word_count"} > 0.2
+        for: 15m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "Caption word-count distribution drift detected"
+          description: >
+            PSI score for caption_word_count is {{ $value | printf "%.3f" }},
+            which exceeds the 0.2 threshold.  The captioner model may have
+            drifted from the training distribution.
+            Automatic retrain webhook will be sent to FastAPI.
+
+  - name: comic_platform_safety
+    interval: 30s
+    rules:
+      - alert: SafetyRejectionRateHigh
+        expr: rate(jobs_total{status="failed"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          team: mlops
+        annotations:
+          summary: "High comic generation failure rate"
+          description: >
+            More than 10% of jobs are failing in the last 5 minutes
+            (current rate: {{ $value | printf "%.3f" }}/s).
+            Check safety filter logs and Detoxify thresholds.
+
+  - name: comic_platform_latency
+    interval: 30s
+    rules:
+      - alert: PipelineP99LatencyHigh
+        expr: >
+          histogram_quantile(
+            0.99,
+            rate(pipeline_stage_duration_seconds_bucket[5m])
+          ) > 30
+        for: 10m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "Pipeline P99 latency exceeds 30s"
+          description: >
+            The 99th-percentile stage latency is {{ $value | printf "%.1f" }}s,
+            which exceeds the 30s threshold.
+
+  - name: comic_platform_queue
+    interval: 15s
+    rules:
+      - alert: QueueDepthHigh
+        expr: queue_depth_gauge > 50
+        for: 5m
+        labels:
+          severity: warning
+          team: mlops
+        annotations:
+          summary: "Celery queue depth is high"
+          description: >
+            The Celery queue has {{ $value }} tasks waiting.
+            Consider scaling up celery-worker replicas.

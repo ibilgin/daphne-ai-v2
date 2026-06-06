@@ -1,0 +1,195 @@
+name: Model Rollback
+
+on:
+  # Triggered by an external webhook POST to /hooks/rollback
+  # In GitHub Actions this is modelled as a repository_dispatch event.
+  repository_dispatch:
+    types:
+      - rollback-trigger
+
+  # Manual override
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for manual rollback"
+        required: false
+        default: "manual override"
+
+env:
+  MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+  MLFLOW_S3_ENDPOINT_URL: ${{ secrets.MINIO_ENDPOINT_URL }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.MINIO_ACCESS_KEY }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.MINIO_SECRET_KEY }}
+  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  evaluate-and-rollback:
+    name: Evaluate metrics and rollback if degraded
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install uv
+          uv pip install --system -r requirements.txt
+
+      - name: Read Production metrics and decide rollback
+        id: rollback_decision
+        run: |
+          cd backend
+          python - <<'PYEOF'
+          import os, sys, json
+          import mlflow
+          from mlflow.tracking import MlflowClient
+
+          TRACKING_URI = os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5001")
+          CAPTIONER_MODEL = "sketch-to-story-captioner"
+          PRODUCTION_ALIAS = "Production"
+
+          # Thresholds — rollback triggers
+          REFUSAL_RATE_THRESHOLD = 0.05
+          CAPTION_METEOR_THRESHOLD = 0.30
+
+          mlflow.set_tracking_uri(TRACKING_URI)
+          client = MlflowClient()
+
+          # ---------------------------------------------------------------
+          # 1. Resolve current Production version
+          # ---------------------------------------------------------------
+          try:
+              mv = client.get_model_version_by_alias(CAPTIONER_MODEL, PRODUCTION_ALIAS)
+          except Exception as exc:
+              print(f"::error::Could not resolve Production alias: {exc}")
+              sys.exit(1)
+
+          current_version = mv.version
+          print(f"Current Production version: {current_version}")
+
+          # ---------------------------------------------------------------
+          # 2. Fetch the run that produced this version and read its metrics
+          # ---------------------------------------------------------------
+          run_id = mv.run_id
+          run = client.get_run(run_id)
+          metrics = run.data.metrics
+
+          refusal_rate = metrics.get("refusal_rate", 0.0)
+          caption_meteor = metrics.get("caption_meteor", 1.0)
+
+          print(f"refusal_rate={refusal_rate}  caption_meteor={caption_meteor}")
+          print(
+              f"Thresholds: refusal_rate>{REFUSAL_RATE_THRESHOLD}  "
+              f"caption_meteor<{CAPTION_METEOR_THRESHOLD}"
+          )
+
+          # ---------------------------------------------------------------
+          # 3. Gate decision
+          # ---------------------------------------------------------------
+          should_rollback = (
+              refusal_rate > REFUSAL_RATE_THRESHOLD
+              or caption_meteor < CAPTION_METEOR_THRESHOLD
+          )
+
+          if not should_rollback:
+              print("Metrics within acceptable range — no rollback needed.")
+              # Write env for subsequent steps
+              with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+                  f.write("rollback_needed=false\n")
+                  f.write(f"current_version={current_version}\n")
+              sys.exit(0)
+
+          # ---------------------------------------------------------------
+          # 4. Find the previous Production version to revert to
+          # ---------------------------------------------------------------
+          all_versions = client.search_model_versions(f"name='{CAPTIONER_MODEL}'")
+          # Sort descending by creation timestamp, skip current
+          sorted_versions = sorted(
+              all_versions,
+              key=lambda v: int(v.version),
+              reverse=True,
+          )
+          previous = next(
+              (v for v in sorted_versions if v.version != current_version),
+              None,
+          )
+
+          if previous is None:
+              print("::error::No previous version found to roll back to.")
+              sys.exit(1)
+
+          previous_version = previous.version
+          print(f"Rolling back from v{current_version} → v{previous_version}")
+
+          client.set_registered_model_alias(
+              name=CAPTIONER_MODEL,
+              alias=PRODUCTION_ALIAS,
+              version=previous_version,
+          )
+          print(f"Production alias updated to v{previous_version}")
+
+          # ---------------------------------------------------------------
+          # 5. Write outputs for next steps
+          # ---------------------------------------------------------------
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write("rollback_needed=true\n")
+              f.write(f"current_version={current_version}\n")
+              f.write(f"previous_version={previous_version}\n")
+              f.write(f"refusal_rate={refusal_rate}\n")
+              f.write(f"caption_meteor={caption_meteor}\n")
+
+          # Write rollback payload for Slack notification
+          payload = {
+              "rolled_back_from": current_version,
+              "rolled_back_to": previous_version,
+              "refusal_rate": refusal_rate,
+              "caption_meteor": caption_meteor,
+              "trigger": os.environ.get("GITHUB_EVENT_NAME", "unknown"),
+          }
+          with open("rollback_payload.json", "w") as f:
+              json.dump(payload, f, indent=2)
+          PYEOF
+
+      - name: Post Slack-style notification (local webhook)
+        if: steps.rollback_decision.outputs.rollback_needed == 'true'
+        env:
+          ROLLED_BACK_FROM: ${{ steps.rollback_decision.outputs.current_version }}
+          ROLLED_BACK_TO: ${{ steps.rollback_decision.outputs.previous_version }}
+          REFUSAL_RATE: ${{ steps.rollback_decision.outputs.refusal_rate }}
+          CAPTION_METEOR: ${{ steps.rollback_decision.outputs.caption_meteor }}
+        run: |
+          PAYLOAD=$(cat backend/rollback_payload.json 2>/dev/null || echo '{}')
+          MESSAGE="*[Rollback Triggered]* \
+          Production captioner rolled back \
+          from v${ROLLED_BACK_FROM} to v${ROLLED_BACK_TO}. \
+          refusal_rate=${REFUSAL_RATE} caption_meteor=${CAPTION_METEOR}"
+
+          if [ -n "$SLACK_WEBHOOK_URL" ]; then
+            curl -s -X POST "$SLACK_WEBHOOK_URL" \
+              -H "Content-Type: application/json" \
+              -d "{\"text\": \"$MESSAGE\", \"payload\": $PAYLOAD}"
+          else
+            echo "SLACK_WEBHOOK_URL not set — logging rollback notification:"
+            echo "$MESSAGE"
+            echo "Full payload:"
+            echo "$PAYLOAD"
+          fi
+
+      - name: Rollback summary
+        if: always()
+        run: |
+          if [ "${{ steps.rollback_decision.outputs.rollback_needed }}" = "true" ]; then
+            echo "ROLLBACK EXECUTED"
+            echo "  From version: ${{ steps.rollback_decision.outputs.current_version }}"
+            echo "  To version:   ${{ steps.rollback_decision.outputs.previous_version }}"
+            echo "  refusal_rate: ${{ steps.rollback_decision.outputs.refusal_rate }}"
+            echo "  caption_meteor: ${{ steps.rollback_decision.outputs.caption_meteor }}"
+          else
+            echo "No rollback needed — metrics are healthy."
+          fi

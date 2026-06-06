@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: config
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  MLFLOW_TRACKING_URI: {{ .Values.config.mlflowTrackingUri | quote }}
+  OLLAMA_BASE_URL: {{ .Values.config.ollamaBaseUrl | quote }}
+  MODEL_ALIAS: {{ .Values.config.modelAlias | quote }}
+  CAPTIONER_MODEL_NAME: {{ .Values.config.captionerModelName | quote }}
+  STORYTELLER_MODEL_NAME: {{ .Values.config.storytellerModelName | quote }}
+  REDIS_URL: {{ .Values.config.redisUrl | quote }}
+  CELERY_BROKER_URL: {{ .Values.config.celeryBrokerUrl | quote }}
+  CELERY_RESULT_BACKEND: {{ .Values.config.celeryResultBackend | quote }}
+  MINIO_ENDPOINT_URL: {{ .Values.config.minioEndpointUrl | quote }}

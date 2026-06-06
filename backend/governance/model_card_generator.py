@@ -1,0 +1,342 @@
+"""
+Model Card Generator — Sketch to Story platform, Phase 5.
+
+Generates a Markdown model card from MLflow run metadata for a given model
+version.  Saves to:
+  - MLflow run artifacts: model_card.md
+  - backend/governance/model_cards/{model_name}_{version}.md
+
+Sections:
+  1. Model Details
+  2. Intended Use
+  3. Limitations
+  4. Training Data
+  5. Evaluation Results
+  6. Ethical Considerations
+  7. EU AI Act Classification
+
+Usage::
+
+    python backend/governance/model_card_generator.py \\
+        --model-name captioner \\
+        --version 1
+
+    # Or from Python:
+    from governance.model_card_generator import generate_model_card
+    generate_model_card("captioner", "1")
+"""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import os
+from datetime import datetime, timezone
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+_HERE = Path(__file__).parent
+_MODEL_CARDS_DIR = _HERE / "model_cards"
+
+# ---------------------------------------------------------------------------
+# Card template
+# ---------------------------------------------------------------------------
+
+_CARD_TEMPLATE = """\
+# Model Card: {model_name} v{version}
+
+Generated: {generated_at}
+MLflow Run: {run_id}
+
+---
+
+## 1. Model Details
+
+| Field         | Value                                      |
+|---------------|--------------------------------------------|
+| Name          | {model_name}                               |
+| Version       | {version}                                  |
+| Type          | {model_type}                               |
+| Framework     | {framework}                                |
+| MLflow Run ID | {run_id}                                   |
+| Registered At | {registered_at}                            |
+
+---
+
+## 2. Intended Use
+
+**Primary use case**: Transform children's hand-drawn sketches into personalised
+comic-book panels by generating descriptive captions (captioner) or narrative
+text (storyteller).
+
+**Intended users**: Parents and educators using the Sketch to Story platform
+with children aged 4–12.
+
+**Out-of-scope uses**:
+- Any application involving real personal data beyond the opaque job UUIDs stored.
+- Consequential decision-making (healthcare, finance, law).
+- Generation of adult or otherwise inappropriate content.
+
+---
+
+## 3. Limitations
+
+- Model performance degrades on highly abstract or scribbled drawings with very
+  low pixel variance.
+- Language support is best for English; multilingual quality may vary.
+- The captioner is fine-tuned on synthetic training data; real-world distribution
+  shift may reduce METEOR/BERTScore.
+- Safety gate (Detoxify multilingual) may have false negatives for novel phrasings.
+
+---
+
+## 4. Training Data
+
+{training_data_description}
+
+**Data minimisation**: No raw image bytes or child names are stored at any stage.
+Only SHA-256 hashes appear in the audit log.
+
+---
+
+## 5. Evaluation Results
+
+| Metric                            | Value        | Threshold  | Status |
+|-----------------------------------|--------------|------------|--------|
+| METEOR                            | {meteor}     | > 0.35     | {meteor_status} |
+| BERTScore F1                      | {bertscore}  | > 0.75     | {bertscore_status} |
+| Detoxify toxicity (worst panel)   | {toxicity}   | < 0.10     | {toxicity_status} |
+| Fairlearn demographic parity diff | {bias_dpd}   | < 0.10     | {bias_status} |
+
+{extra_metrics}
+
+---
+
+## 6. Ethical Considerations
+
+- **Child safety**: Every generated story is screened by Detoxify multilingual
+  before delivery. Toxicity threshold 0.1, identity_attack threshold 0.05.
+  Failures trigger a human review queue.
+- **Privacy**: Raw image bytes are never persisted. Only SHA-256 hashes are
+  stored in the audit log. Child names are not stored in any persistent table.
+- **Bias**: Fairlearn MetricFrame audit across `age_group` proxy (4-6, 7-9, 10-12)
+  ensures demographic parity difference ≤ 0.10.
+- **Transparency**: Parents receive a transparency notice before use explaining
+  what data is processed and how it is used.
+- **Access control**: JWT RBAC enforces `parent` / `admin` / `platform` role
+  separation. Admin-only audit endpoint available for oversight.
+
+---
+
+## 7. EU AI Act Classification
+
+**Classification**: Limited Risk
+
+**Justification**: The system generates creative content (comic book panels) for
+entertainment purposes. It does not make consequential decisions affecting
+individuals' rights, opportunities, or access to essential services.
+
+**Additional obligations triggered by processing children's data**:
+- Transparency notice to parents before use — implemented.
+- Data minimisation (hashes only in audit log) — implemented.
+- Human review queue for escalated safety cases — implemented.
+- Full audit trail for every inference — implemented via `comic_audit` table.
+
+Reference: `docs/governance/ai-act-classification.md`
+
+---
+
+*This model card was auto-generated by `backend/governance/model_card_generator.py`.*
+*Review and update manually if any section is inaccurate.*
+"""
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _safe_metric(run_data, key: str, default: str = "N/A") -> str:
+    """Extract a metric from an MLflow RunData object, returning default if absent."""
+    try:
+        metrics = run_data.metrics or {}
+        val = metrics.get(key)
+        if val is None:
+            return default
+        return f"{float(val):.4f}"
+    except Exception:  # noqa: BLE001
+        return default
+
+
+def _pass_fail(value_str: str, threshold: float, higher_is_better: bool) -> str:
+    """Return PASS or FAIL string given a metric value string."""
+    try:
+        val = float(value_str)
+        if higher_is_better:
+            return "PASS" if val >= threshold else "FAIL"
+        else:
+            return "PASS" if val <= threshold else "FAIL"
+    except (ValueError, TypeError):
+        return "N/A"
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+
+def generate_model_card(
+    model_name: str,
+    version: str,
+    mlflow_tracking_uri: str | None = None,
+) -> Path:
+    """
+    Generate and save a model card for the given model version.
+
+    Parameters
+    ----------
+    model_name:
+        Registered model name in MLflow (e.g. "captioner", "storyteller").
+    version:
+        Model version string (e.g. "1", "2").
+    mlflow_tracking_uri:
+        Override the MLflow tracking URI.  Defaults to MLFLOW_TRACKING_URI
+        env var or ``http://localhost:5001``.
+
+    Returns
+    -------
+    Path to the saved model card file.
+    """
+    import mlflow
+    from mlflow.tracking import MlflowClient
+
+    tracking_uri = mlflow_tracking_uri or os.environ.get(
+        "MLFLOW_TRACKING_URI", "http://localhost:5001"
+    )
+    mlflow.set_tracking_uri(tracking_uri)
+    client = MlflowClient(tracking_uri=tracking_uri)
+
+    # Fetch model version metadata
+    try:
+        mv = client.get_model_version(name=model_name, version=version)
+        run_id = mv.run_id
+        registered_at = mv.creation_timestamp
+        registered_at_str = (
+            datetime.fromtimestamp(registered_at / 1000, tz=timezone.utc).isoformat()
+            if registered_at
+            else "N/A"
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("model_card_generator: could not fetch model version — %s", exc)
+        run_id = "unknown"
+        registered_at_str = "N/A"
+
+    # Fetch run metrics
+    run_data = None
+    extra_metric_lines: list[str] = []
+    if run_id and run_id != "unknown":
+        try:
+            run = client.get_run(run_id)
+            run_data = run.data
+            # Collect any extra metrics not in the standard table
+            known_keys = {
+                "meteor", "bertscore_f1", "detoxify_toxicity_worst",
+                "bias_demographic_parity_diff",
+            }
+            for k, v in (run_data.metrics or {}).items():
+                if k not in known_keys:
+                    extra_metric_lines.append(f"| {k:<33} | {v:<12.4f} |")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("model_card_generator: could not fetch run data — %s", exc)
+
+    meteor_str = _safe_metric(run_data, "meteor") if run_data else "N/A"
+    bertscore_str = _safe_metric(run_data, "bertscore_f1") if run_data else "N/A"
+    toxicity_str = _safe_metric(run_data, "detoxify_toxicity_worst") if run_data else "N/A"
+    bias_str = _safe_metric(run_data, "bias_demographic_parity_diff") if run_data else "N/A"
+
+    model_type = "Image captioner (BLIP)" if "caption" in model_name else "Story generator (Ollama)"
+    framework = "HuggingFace Transformers + MLflow pyfunc" if "caption" in model_name else "LangChain + Ollama + MLflow pyfunc"
+
+    training_data = (
+        "Synthetic dataset: 500 labelled sketch-caption pairs generated by combining "
+        "COCO-style annotations with child-drawing style augmentations. "
+        "No real children's drawings or personal data used in training."
+        if "caption" in model_name
+        else "Synthetic prompts derived from public children's book corpora. "
+        "No personal data used."
+    )
+
+    extra_metrics_section = ""
+    if extra_metric_lines:
+        header = "| Additional Metric                 | Value        |\n|-----------------------------------|--------------|"
+        extra_metrics_section = header + "\n" + "\n".join(extra_metric_lines)
+
+    card_content = _CARD_TEMPLATE.format(
+        model_name=model_name,
+        version=version,
+        generated_at=datetime.now(tz=timezone.utc).isoformat(),
+        run_id=run_id,
+        model_type=model_type,
+        framework=framework,
+        registered_at=registered_at_str,
+        training_data_description=training_data,
+        meteor=meteor_str,
+        meteor_status=_pass_fail(meteor_str, 0.35, True),
+        bertscore=bertscore_str,
+        bertscore_status=_pass_fail(bertscore_str, 0.75, True),
+        toxicity=toxicity_str,
+        toxicity_status=_pass_fail(toxicity_str, 0.10, False),
+        bias_dpd=bias_str,
+        bias_status=_pass_fail(bias_str, 0.10, False),
+        extra_metrics=extra_metrics_section,
+    )
+
+    # Save to model_cards directory
+    _MODEL_CARDS_DIR.mkdir(parents=True, exist_ok=True)
+    card_path = _MODEL_CARDS_DIR / f"{model_name}_{version}.md"
+    card_path.write_text(card_content, encoding="utf-8")
+    logger.info("model_card_generator: saved %s", card_path)
+
+    # Log to MLflow as a run artifact
+    if run_id and run_id != "unknown":
+        try:
+            import tempfile
+
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".md", delete=False, encoding="utf-8"
+            ) as tmp:
+                tmp.write(card_content)
+                tmp_path = tmp.name
+            client.log_artifact(run_id, tmp_path, artifact_path="")
+            import os as _os
+            _os.unlink(tmp_path)
+            logger.info(
+                "model_card_generator: logged model_card.md to MLflow run %s", run_id
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "model_card_generator: could not log artifact to MLflow — %s", exc
+            )
+
+    print(f"Model card saved: {card_path}")
+    return card_path
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    parser = argparse.ArgumentParser(
+        description="Generate a Markdown model card from MLflow run metadata."
+    )
+    parser.add_argument("--model-name", required=True, help="MLflow registered model name")
+    parser.add_argument("--version", required=True, help="Model version (e.g. 1)")
+    parser.add_argument(
+        "--mlflow-uri",
+        default=None,
+        help="MLflow tracking URI (default: MLFLOW_TRACKING_URI env var)",
+    )
+    args = parser.parse_args()
+    generate_model_card(args.model_name, args.version, args.mlflow_uri)

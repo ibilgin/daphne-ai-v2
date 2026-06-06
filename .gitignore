@@ -16,7 +16,12 @@ build/
 
 # ML artifacts
 chroma_db/
+backend/chroma_db/
+# Ignore reports directories (generated drift/eval output) but keep the
+# monitoring/reports directory skeleton so the exporter can find the path.
 reports/
+!backend/monitoring/reports/
+backend/monitoring/reports/drift_*.json
 mlruns/
 mlflow_artifacts/
 *.safetensors

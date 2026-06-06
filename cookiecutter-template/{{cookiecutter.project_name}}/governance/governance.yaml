@@ -1,0 +1,92 @@
+# Governance Gate Configuration — {{ cookiecutter.project_name }}
+#
+# Machine-readable checklist evaluated by gate_runner.py.
+# ALL checks with required: true must have status: pass before any model
+# Production alias update.
+#
+# Run the gate: python3 governance/gate_runner.py
+# Interpret results: exit 0 = all required checks pass; exit 1 = failure
+
+checks:
+  safety_gate:
+    name: Content Safety Gate
+    type: boolean
+    required: true
+    status: pending
+    description: >
+      Every model output must pass automated content safety checks before
+      reaching end users. Implement in src/security/safety_gate.py.
+    last_verified: null
+
+  quality_gate:
+    name: Model Quality Gate
+    type: metric
+    required: true
+    status: pending
+    thresholds:
+      meteor_min: 0.35
+      bertscore_f1_min: 0.75
+    description: >
+      Model quality must meet minimum thresholds before promotion to Production.
+      Evaluate with src/eval/quality_gate.py.
+    last_verified: null
+
+  bias_audit:
+    name: Bias Audit
+    type: metric
+    required: true
+    status: pending
+    thresholds:
+      demographic_parity_difference_max: 0.1
+    description: >
+      Fairlearn demographic parity difference must not exceed threshold.
+      Evaluate with src/governance/bias_audit.py.
+    last_verified: null
+
+  data_privacy:
+    name: Data Privacy — Minimisation
+    type: boolean
+    required: true
+    status: pending
+    description: >
+      Only minimum necessary data is collected and stored. No raw PII
+      in audit logs. Verified by integration tests.
+    last_verified: null
+
+  transparency_notice:
+    name: User Transparency Notice
+    type: boolean
+    required: true
+    status: pending
+    description: >
+      Users must be informed about AI involvement before any AI-generated
+      content is delivered. Transparency notice implemented in UI.
+    last_verified: null
+
+  audit_trail:
+    name: Audit Trail Completeness
+    type: boolean
+    required: true
+    status: pending
+    description: >
+      Every inference must produce an audit log entry. No silent failures.
+    last_verified: null
+
+  model_card:
+    name: Model Card Completeness
+    type: boolean
+    required: false
+    status: pending
+    description: >
+      A model card documenting intended use, limitations, and evaluation
+      results must exist for each Production model.
+    last_verified: null
+
+  security_scan:
+    name: Static Security Scan
+    type: boolean
+    required: false
+    status: pending
+    description: >
+      bandit security scan of backend codebase must report no HIGH severity issues.
+    last_verified: null

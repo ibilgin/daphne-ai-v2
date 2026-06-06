@@ -1,0 +1,350 @@
+# =============================================================================
+# Sketch to Story — unified local dev stack
+#
+# Quick start:
+#   cp .env.example .env
+#   ollama serve && ollama pull mistral   # on host, once
+#   make up                               # starts everything
+#   make up-full                          # + monitoring (Prometheus/Grafana)
+#
+# Ports at a glance:
+#   Frontend  http://localhost:5173
+#   BFF       http://localhost:3001
+#   FastAPI   http://localhost:8000
+#   MLflow    http://localhost:5001
+#   MinIO     http://localhost:9001  (minioadmin / minioadmin)
+#   Grafana   http://localhost:3000  (admin / admin)  — make up-full only
+# =============================================================================
+
+networks:
+  default:
+    name: daphne-net
+
+volumes:
+  postgres-data:
+  minio-data:
+  chroma-db:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:
+  evidently-reports:
+  drift-db:
+  bff-node-modules:
+  frontend-node-modules:
+
+services:
+
+  # ── Infrastructure ──────────────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:15
+    container_name: daphne-postgres
+    environment:
+      POSTGRES_USER: mlflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mlflow}
+      POSTGRES_DB: mlflow
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mlflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: daphne-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: daphne-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 ${MINIO_ACCESS_KEY:-minioadmin} ${MINIO_SECRET_KEY:-minioadmin} &&
+        mc mb --ignore-existing local/mlflow-artifacts &&
+        echo 'Bucket mlflow-artifacts ready'
+      "
+    restart: "no"
+
+  mlflow:
+    build:
+      context: ./mlflow
+      dockerfile: Dockerfile
+    image: daphne-mlflow:latest
+    container_name: daphne-mlflow
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "5001:5000"
+    command: >
+      mlflow server
+        --backend-store-uri postgresql://mlflow:${POSTGRES_PASSWORD:-mlflow}@postgres:5432/mlflow
+        --default-artifact-root s3://mlflow-artifacts/
+        --host 0.0.0.0
+        --port 5000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: daphne-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Application ─────────────────────────────────────────────────────────────
+
+  fastapi:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: daphne-fastapi
+    image: daphne-backend:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-db:/app/chroma_db
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-mistral}
+      MODEL_ALIAS: Production
+      CAPTIONER_MODEL_NAME: captioner
+      STORYTELLER_MODEL_NAME: storyteller
+      MINIO_ENDPOINT_URL: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-dev-webhook-secret}
+      ENABLE_TOKEN_CREATION: ${ENABLE_TOKEN_CREATION:-true}
+      DATABASE_URL: postgresql+asyncpg://mlflow:${POSTGRES_PASSWORD:-mlflow}@postgres:5432/mlflow
+    depends_on:
+      redis:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: daphne-backend:latest
+    container_name: daphne-celery
+    command: ["celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info", "--concurrency=2"]
+    volumes:
+      - chroma-db:/app/chroma_db
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-mistral}
+      MODEL_ALIAS: Production
+      CAPTIONER_MODEL_NAME: captioner
+      STORYTELLER_MODEL_NAME: storyteller
+      MINIO_ENDPOINT_URL: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      AWS_ACCESS_KEY_ID: ${MINIO_ACCESS_KEY:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret}
+      DATABASE_URL: postgresql+asyncpg://mlflow:${POSTGRES_PASSWORD:-mlflow}@postgres:5432/mlflow
+    depends_on:
+      redis:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Frontend ─────────────────────────────────────────────────────────────────
+
+  bff:
+    build:
+      context: ./bff
+      dockerfile: Dockerfile.dev
+    container_name: daphne-bff
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: "3001"
+      FASTAPI_URL: http://fastapi:8000
+      NODE_ENV: development
+    volumes:
+      - ./bff/src:/app/src           # hot reload
+      - bff-node-modules:/app/node_modules
+    depends_on:
+      fastapi:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: daphne-frontend
+    ports:
+      - "5173:5173"
+    environment:
+      API_PROXY_TARGET: http://bff:3001  # Vite server-side proxy target (not embedded in client bundle)
+    volumes:
+      - ./frontend/src:/app/src      # hot reload
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.js:/app/vite.config.js
+      - frontend-node-modules:/app/node_modules
+    depends_on:
+      - bff
+    restart: unless-stopped
+
+  # ── Monitoring (opt-in: make up-full) ───────────────────────────────────────
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    container_name: daphne-prometheus
+    profiles: [monitoring]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=30d"
+      - "--web.enable-lifecycle"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: daphne-alertmanager
+    profiles: [monitoring]
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager/config.yml:/etc/alertmanager/config.yml:ro
+      - alertmanager-data:/alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/config.yml"
+      - "--storage.path=/alertmanager"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana-oss:10.4.3
+    container_name: daphne-grafana
+    profiles: [monitoring]
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/dashboard.json
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboard.json:/etc/grafana/dashboards/dashboard.json:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  evidently-exporter:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: daphne-evidently-exporter
+    profiles: [monitoring]
+    command: ["python", "-m", "monitoring.evidently_exporter"]
+    environment:
+      EVIDENTLY_EXPORTER_PORT: "9101"
+      EVIDENTLY_REFRESH_INTERVAL: "60"
+      EVIDENTLY_REPORTS_DIR: /app/monitoring/reports
+    ports:
+      - "9101:9101"
+    volumes:
+      - evidently-reports:/app/monitoring/reports
+    restart: unless-stopped
+
+  drift-reporter:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: daphne-drift-reporter
+    profiles: [monitoring]
+    command: ["python", "-m", "monitoring.drift_reporter"]
+    environment:
+      DRIFT_DB_PATH: /app/monitoring/captions.db
+      DRIFT_REPORTS_DIR: /app/monitoring/reports
+    volumes:
+      - drift-db:/app/monitoring
+      - evidently-reports:/app/monitoring/reports
+    restart: "no"

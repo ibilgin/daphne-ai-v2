@@ -1,0 +1,102 @@
+# ============================================================
+# comic-platform Helm chart — default values
+# Override at deploy time with --set or -f values-override.yaml
+# ============================================================
+
+# ---------------------------------------------------------------------------
+# Global
+# ---------------------------------------------------------------------------
+namespace: team-comics
+
+image:
+  repository: daphne-backend
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# ---------------------------------------------------------------------------
+# FastAPI (api deployment)
+# ---------------------------------------------------------------------------
+api:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+  service:
+    type: ClusterIP
+    port: 8000
+  readinessProbe:
+    path: /health
+    initialDelaySeconds: 15
+    periodSeconds: 10
+  livenessProbe:
+    path: /metrics
+    initialDelaySeconds: 30
+    periodSeconds: 30
+
+# ---------------------------------------------------------------------------
+# Celery worker (worker deployment — KEDA scales this)
+# ---------------------------------------------------------------------------
+worker:
+  replicaCount: 1  # KEDA overrides at runtime; this is the base count
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 2Gi
+
+# ---------------------------------------------------------------------------
+# Ingress
+# ---------------------------------------------------------------------------
+ingress:
+  host: comics.local
+  className: traefik  # k3s default ingress class
+
+# ---------------------------------------------------------------------------
+# Config (non-secret)
+# ---------------------------------------------------------------------------
+config:
+  mlflowTrackingUri: http://mlflow.team-platform.svc.cluster.local:5000
+  ollamaBaseUrl: http://ollama.team-platform.svc.cluster.local:11434
+  modelAlias: Production
+  captionerModelName: captioner
+  storytellerModelName: storyteller
+  redisUrl: redis://redis.team-comics.svc.cluster.local:6379/0
+  celeryBrokerUrl: redis://redis.team-comics.svc.cluster.local:6379/0
+  celeryResultBackend: redis://redis.team-comics.svc.cluster.local:6379/0
+  minioEndpointUrl: http://minio.team-platform.svc.cluster.local:9000
+
+# ---------------------------------------------------------------------------
+# Secrets (supply via --set at deploy time — never commit real values)
+# ---------------------------------------------------------------------------
+secrets:
+  minioAccessKey: ""  # --set secrets.minioAccessKey=<value>
+  minioSecretKey: ""  # --set secrets.minioSecretKey=<value>
+
+# ---------------------------------------------------------------------------
+# ResourceQuota for team-comics namespace
+# ---------------------------------------------------------------------------
+resourceQuota:
+  requests:
+    cpu: "4"
+    memory: 8Gi
+  limits:
+    cpu: "8"
+    memory: 16Gi
+  pods: "20"
+
+# ---------------------------------------------------------------------------
+# LimitRange defaults for team-comics namespace
+# ---------------------------------------------------------------------------
+limitRange:
+  defaultRequest:
+    cpu: 100m
+    memory: 128Mi
+  defaultLimit:
+    cpu: 500m
+    memory: 512Mi
