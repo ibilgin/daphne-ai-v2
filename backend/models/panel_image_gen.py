@@ -7,18 +7,25 @@ panel's narrative moment.
 
 Backend selection via PANEL_IMG_GEN_BACKEND env var
 ----------------------------------------------------
-"stability"  Stability AI Control/Sketch API (POST /v2beta/stable-image/control/sketch).
-             Requires: STABILITY_API_KEY env var (sourced from Vault in production).
-             The child's drawing acts as the sketch guide; the narration is the prompt.
-             control_strength=0.7 keeps the original shapes while adding illustration
-             detail.  style_preset="comic-book" gives a storybook aesthetic.
+"stability"       Stability AI Control/Sketch API (POST /v2beta/stable-image/control/sketch).
+                  Requires: STABILITY_API_KEY env var (sourced from Vault in production).
+                  The child's drawing acts as the sketch guide; the narration is the prompt.
+                  control_strength=0.7 keeps the original shapes while adding illustration
+                  detail.  style_preset="comic-book" gives a storybook aesthetic.
 
-"hf_api"     HuggingFace Inference API img2img
-             (stabilityai/stable-diffusion-xl-refiner-1.0 or similar).
-             Requires: HF_API_TOKEN env var (sourced from Vault in production).
+"hf_api"          HuggingFace Inference API img2img
+                  (stabilityai/stable-diffusion-xl-refiner-1.0 or similar).
+                  Requires: HF_API_TOKEN env var (sourced from Vault in production).
 
-"pil"        PIL pencil-sketch + mood-tint fallback (no API key needed).
-             Always available.  Used automatically when no API key is configured.
+"local_diffusers" FLUX.1 img2img via mflux (Apple MLX). Apple Silicon only.
+                  No API key needed. First run downloads ~8GB model from HuggingFace.
+                  Subsequent runs load from ~/.cache/mflux.
+                  Install: pip install mflux  (not included in Docker image).
+                  Tune with: MFLUX_MODEL, MFLUX_QUANTIZE, MFLUX_STEPS,
+                             MFLUX_INIT_IMAGE_STRENGTH.
+
+"pil"             PIL pencil-sketch + mood-tint fallback (no API key needed).
+                  Always available.  Used automatically when no API key is configured.
 
 Upgrading to a production backend
 ----------------------------------
@@ -162,6 +169,96 @@ def _hf_img2img(seed_b64: str, narration: str, style: str) -> str:
 # PIL fallback backend
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Local mflux backend (Apple Silicon only)
+# ---------------------------------------------------------------------------
+
+def _mflux_img2img(seed_b64: str, narration: str, panel_num: int, style: str) -> str:
+    """
+    Run FLUX.1 img2img locally via mflux (Apple MLX).
+
+    Env vars
+    --------
+    MFLUX_MODEL              flux-schnell | flux-dev  (default: flux-schnell)
+    MFLUX_QUANTIZE           4 | 8                    (default: 4)
+    MFLUX_STEPS              inference steps          (default: 4 for schnell, 20 for dev)
+    MFLUX_INIT_IMAGE_STRENGTH  0.0–1.0, how much the seed guides output
+                               lower = more creative, higher = closer to seed
+                               (default: 0.35)
+
+    First run downloads the model from HuggingFace (~8GB for schnell Q4).
+    Subsequent runs load from the MLX cache (~/.cache/mflux).
+
+    Mac-only: this backend requires Apple Silicon and will not run in Docker.
+    """
+    import io  # noqa: PLC0415
+    import os as _os  # noqa: PLC0415
+    import tempfile  # noqa: PLC0415
+
+    from PIL import Image  # noqa: PLC0415
+
+    try:
+        from mflux import Config, Flux1  # noqa: PLC0415
+    except ImportError as exc:
+        raise RuntimeError(
+            "mflux not installed. Run: pip install mflux  "
+            "(Apple Silicon only — requires macOS with Metal support)"
+        ) from exc
+
+    model_alias = os.environ.get("MFLUX_MODEL", "flux-schnell")
+    quantize = int(os.environ.get("MFLUX_QUANTIZE", "4"))
+    default_steps = "4" if model_alias == "flux-schnell" else "20"
+    steps = int(os.environ.get("MFLUX_STEPS", default_steps))
+    init_strength = float(os.environ.get("MFLUX_INIT_IMAGE_STRENGTH", "0.35"))
+
+    prompt = (
+        f"{narration}. {_style_suffix(style)}, "
+        "children's comic book illustration, child-friendly, vibrant colours, no text"
+    )
+
+    # Decode seed → resize to 512×512 → write to temp file (mflux needs a path)
+    seed_bytes = base64.b64decode(seed_b64)
+    seed_img = Image.open(io.BytesIO(seed_bytes)).convert("RGB").resize(
+        (512, 512), Image.LANCZOS
+    )
+
+    tmp_in = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+    try:
+        seed_img.save(tmp_in, format="JPEG", quality=90)
+        tmp_in.close()
+
+        logger.info(
+            "mflux: loading model=%s quantize=%d steps=%d init_strength=%.2f",
+            model_alias, quantize, steps, init_strength,
+        )
+
+        # Load model (cached after first run)
+        flux = Flux1.from_alias(alias=model_alias, quantize=quantize)
+
+        # Vary seed per panel so each panel is unique
+        panel_seed = 42 + panel_num * 7
+
+        generated = flux.generate_image(
+            seed=panel_seed,
+            prompt=prompt,
+            config=Config(
+                num_inference_steps=steps,
+                height=512,
+                width=512,
+                init_image_path=tmp_in.name,
+                init_image_strength=init_strength,
+            ),
+        )
+
+        # `generated.image` is a PIL Image
+        buf = io.BytesIO()
+        generated.image.convert("RGB").save(buf, format="JPEG", quality=88)
+        return base64.b64encode(buf.getvalue()).decode()
+
+    finally:
+        _os.unlink(tmp_in.name)
+
+
 def _pil_fallback(seed_b64: str, narration: str, panel_num: int, style: str) -> str:
     """PIL pencil-sketch + mood-tint fallback (always available)."""
     import io  # noqa: PLC0415
@@ -220,6 +317,9 @@ class PanelImageGenModel(mlflow.pyfunc.PythonModel):
             elif backend == "hf_api":
                 image_b64 = _hf_img2img(seed_b64, narration, style)
                 logger.info("panel_image_gen: HF API img2img OK")
+            elif backend == "local_diffusers":
+                image_b64 = _mflux_img2img(seed_b64, narration, panel_num, style)
+                logger.info("panel_image_gen: mflux local img2img OK")
             else:
                 image_b64 = _pil_fallback(seed_b64, narration, panel_num, style)
         except Exception as exc:  # noqa: BLE001

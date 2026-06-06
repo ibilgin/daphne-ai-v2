@@ -108,3 +108,11 @@ asyncpg>=0.29
 
 # PyYAML — gate_runner.py reads governance.yaml
 pyyaml>=6.0
+
+# ---------------------------------------------------------------------------
+# Optional — local image generation (Apple Silicon only)
+# ---------------------------------------------------------------------------
+# mflux: FLUX.1 via Apple MLX. Only works on macOS with Apple Silicon.
+# Install manually when running on Mac (not needed inside Docker):
+#   pip install mflux
+# mflux>=0.4
