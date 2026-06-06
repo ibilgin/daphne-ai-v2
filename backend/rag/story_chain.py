@@ -130,12 +130,7 @@ def generate_panels(
     RuntimeError
         If all retry attempts fail to produce valid JSON.
     """
-    try:
-        from langchain_community.chat_models import ChatOllama
-        from langchain_core.messages import HumanMessage, SystemMessage
-    except ImportError:
-        # Fallback import path for older langchain_community
-        from langchain_community.llms import Ollama  # type: ignore[assignment]
+    from langchain_community.llms import Ollama  # noqa: PLC0415
 
     ollama_url = os.environ.get("OLLAMA_BASE_URL", _DEFAULT_OLLAMA_URL)
     model_name = os.environ.get("OLLAMA_MODEL", _DEFAULT_MODEL)
@@ -144,20 +139,16 @@ def generate_panels(
     user_prompt = _build_user_prompt(
         caption, style_examples, child_name, panel_count, safety_failure_reason
     )
+    # Combine into a single prompt — Ollama LLM takes a plain string
+    full_prompt = f"{system_prompt}\n\n{user_prompt}"
 
-    # Build ChatOllama with format="json" for structured output
-    llm = ChatOllama(
+    llm = Ollama(
         base_url=ollama_url,
         model=model_name,
         format="json",
         temperature=0.7,
         num_predict=1024,
     )
-
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=user_prompt),
-    ]
 
     last_error: Exception | None = None
 
@@ -170,8 +161,8 @@ def generate_panels(
                 ollama_url,
                 model_name,
             )
-            response = llm.invoke(messages)
-            raw_content: str = response.content if hasattr(response, "content") else str(response)
+            response = llm.invoke(full_prompt)
+            raw_content: str = response if isinstance(response, str) else str(response)
             parsed = json.loads(raw_content)
             panels = _validate_panels(parsed, panel_count)
             logger.info("story_chain: generated %d panels successfully", len(panels))
