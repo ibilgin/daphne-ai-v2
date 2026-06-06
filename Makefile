@@ -64,6 +64,7 @@ shell: ## Open a shell in a container: make shell s=fastapi
 	docker compose exec $(s) sh
 
 seed: ## Register stub pyfunc models in MLflow so the UI works without real weights
+	docker cp backend/scripts/seed_dev_models.py daphne-fastapi:/app/scripts/seed_dev_models.py
 	docker compose exec fastapi python scripts/seed_dev_models.py
 	docker compose restart fastapi celery-worker
 
