@@ -16,6 +16,7 @@ storyteller = get_storyteller()
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any
 
@@ -28,6 +29,24 @@ logger = logging.getLogger(__name__)
 _captioner: Any = None
 _storyteller: Any = None
 _panel_image_gen: Any = None
+
+
+class _DirectPanelImageGen:
+    """
+    Wraps PanelImageGenModel to match the mlflow.pyfunc.PyFuncModel.predict(data)
+    interface so the generate_panel_images node can call it the same way.
+
+    Used when MLflow/MinIO is unavailable (e.g. running FastAPI directly on Mac)
+    but PANEL_IMG_GEN_BACKEND is set to a non-PIL backend such as local_diffusers.
+    """
+
+    def __init__(self) -> None:
+        from models.panel_image_gen import PanelImageGenModel  # noqa: PLC0415
+
+        self._impl = PanelImageGenModel()
+
+    def predict(self, data: Any, params: Any = None) -> Any:
+        return self._impl.predict(None, data)
 
 
 def _load_with_retry(model_name: str, alias: str, max_retries: int = 3) -> Any:
@@ -78,12 +97,28 @@ def load_all_models() -> None:
     try:
         _panel_image_gen = _load_with_retry("panel_image_gen", alias, max_retries=1)
     except Exception as exc:  # noqa: BLE001
-        logger.warning(
-            "model_loader: panel_image_gen not found in registry (%s) — "
-            "PIL fallback will be used. Run `make seed` to register the stub.",
-            exc,
-        )
-        _panel_image_gen = None
+        backend = os.environ.get("PANEL_IMG_GEN_BACKEND", "pil").lower()
+        if backend != "pil":
+            # A generative backend is requested but MLflow is unavailable (e.g.
+            # running FastAPI directly on Mac without Docker).  Instantiate
+            # PanelImageGenModel directly so the backend env var is honoured.
+            try:
+                _panel_image_gen = _DirectPanelImageGen()
+                logger.info(
+                    "model_loader: MLflow unavailable (%s) — using PanelImageGenModel "
+                    "directly (backend=%s)",
+                    exc, backend,
+                )
+            except Exception as inner:  # noqa: BLE001
+                logger.warning("model_loader: PanelImageGenModel direct init failed — %s", inner)
+                _panel_image_gen = None
+        else:
+            logger.warning(
+                "model_loader: panel_image_gen not found in registry (%s) — "
+                "PIL fallback will be used. Run `make seed` to register the stub.",
+                exc,
+            )
+            _panel_image_gen = None
 
     logger.info("model_loader: all models ready")
 
