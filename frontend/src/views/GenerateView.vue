@@ -247,7 +247,7 @@ async function submitForm() {
   submitting.value = true
   try {
     const fd = new FormData()
-    fd.append('drawing', form.value.file)
+    fd.append('file', form.value.file)
     fd.append('child_name', form.value.childName.trim())
     fd.append('age_group', form.value.ageGroup)
     fd.append('style', form.value.style)

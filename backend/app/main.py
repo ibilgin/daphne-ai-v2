@@ -176,6 +176,7 @@ async def generate_comic(
     file: UploadFile = File(..., description="Child's drawing (JPEG or PNG, max 5 MB)"),
     child_name: str = Form(..., description="Child's first name"),
     style: str = Form(..., description="Art style for the comic"),
+    age_group: str = Form(default="7-9", description="Child's age group: 4-6, 7-9, or 10-12"),
     _token: TokenPayload = require_role("parent"),
 ) -> Any:
     """
@@ -224,7 +225,7 @@ async def generate_comic(
 
     from app.tasks import generate_comic as celery_generate_comic
 
-    celery_generate_comic.delay(job_id, image_bytes_b64, child_name, style)
+    celery_generate_comic.delay(job_id, image_bytes_b64, child_name, style, age_group)
 
     jobs_total.labels(status="queued").inc()
     queue_depth_gauge.inc()
