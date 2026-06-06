@@ -118,16 +118,12 @@ def _get_redis() -> redis_lib.Redis:
 _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png"}
 
 
-def _validate_image(file_bytes: bytes, content_type: str | None) -> None:
+def _validate_image(file_bytes: bytes, content_type: str | None) -> None:  # noqa: ARG001
     """Raise HTTPException if the image fails any validation check."""
-    # 1. Content-type check
-    if content_type not in _ALLOWED_CONTENT_TYPES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported image type '{content_type}'. Use JPEG or PNG.",
-        )
+    import numpy as np
+    from PIL import Image
 
-    # 2. Size check
+    # 1. Size check (cheapest — do first)
     if len(file_bytes) > settings.max_image_bytes:
         mb = settings.max_image_bytes // (1024 * 1024)
         raise HTTPException(
@@ -135,16 +131,23 @@ def _validate_image(file_bytes: bytes, content_type: str | None) -> None:
             detail=f"Image exceeds maximum allowed size of {mb} MB.",
         )
 
-    # 3. Blank image check via pixel standard deviation
+    # 2. Detect actual format from magic bytes — don't trust the content-type
+    #    header, which browsers report inconsistently (image/jpg vs image/jpeg,
+    #    empty string, image/webp, etc.).
     try:
-        import numpy as np
-        from PIL import Image
-
-        img = Image.open(io.BytesIO(file_bytes)).convert("L")  # greyscale
-        std = float(np.array(img).std())
+        img = Image.open(io.BytesIO(file_bytes))
+        fmt = (img.format or "").upper()
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=400, detail=f"Could not decode image: {exc}") from exc
 
+    if fmt not in {"JPEG", "PNG"}:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported image format '{fmt or 'unknown'}'. Please upload a JPEG or PNG.",
+        )
+
+    # 3. Blank image check via pixel standard deviation
+    std = float(np.array(img.convert("L")).std())
     if std < settings.min_std_deviation:
         raise HTTPException(
             status_code=400,

@@ -30,7 +30,7 @@
                 <FileUpload
                   ref="fileUploadRef"
                   mode="advanced"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/jpg"
                   :max-file-size="5242880"
                   :multiple="false"
                   :auto="false"
