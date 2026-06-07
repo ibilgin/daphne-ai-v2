@@ -7,6 +7,12 @@ No default credentials are ever hardcoded here.
 
 from __future__ import annotations
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv(override=False)  # no-op if .env absent; real env vars take priority
+except ImportError:
+    pass
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
