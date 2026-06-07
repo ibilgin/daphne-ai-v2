@@ -7,6 +7,12 @@ No default credentials are ever hardcoded here.
 
 from __future__ import annotations
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv(override=False)  # no-op if .env absent; real env vars take priority
+except ImportError:
+    pass
+
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
@@ -62,7 +68,7 @@ class Settings(BaseSettings):
     # CORS — comma-separated list of allowed origins
     cors_origins: str = Field(default="*", alias="CORS_ORIGINS")
 
-    model_config = {"env_file": ".env", "populate_by_name": True}
+    model_config = {"env_file": ".env", "populate_by_name": True, "extra": "ignore"}
 
 
 _settings: Settings | None = None

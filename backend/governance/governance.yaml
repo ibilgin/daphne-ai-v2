@@ -130,3 +130,32 @@ checks:
       to previous version when quality metrics degrade. Tested via
       act -j rollback --secret-file .secrets.
     last_verified: "2026-06-05"
+
+  panel_image_gen_registered:
+    name: Panel Image Gen Model Registered
+    type: boolean
+    required: false
+    status: pass
+    description: >
+      panel_image_gen pyfunc model registered in MLflow with Production alias.
+      Selects backend via PANEL_IMG_GEN_BACKEND env var:
+        pil       — PIL pencil-sketch + mood tint (always available, no API key)
+        stability — Stability AI /v2beta/stable-image/control/sketch
+        hf_api    — HuggingFace Inference API img2img
+      API credentials injected via Vault; never hardcoded. Falls back to PIL
+      pencil-sketch automatically when registry model is absent.
+      Implemented in backend/models/panel_image_gen.py.
+    last_verified: "2026-06-07"
+
+  narrative_input_sanitised:
+    name: Rough Narrative Input Sanitised
+    type: boolean
+    required: true
+    status: pass
+    description: >
+      rough_narrative field on POST /api/generate-comic is stripped and capped
+      at 2000 characters before being passed to Celery.  Only the SHA-256 hash
+      is written to the audit log — raw narrative text is never persisted.
+      The safety gate (Detoxify) runs on all generated panel text regardless of
+      whether a narrative was provided.
+    last_verified: "2026-06-07"

@@ -180,10 +180,23 @@ async def generate_comic(
     child_name: str = Form(..., description="Child's first name"),
     style: str = Form(..., description="Art style for the comic"),
     age_group: str = Form(default="7-9", description="Child's age group: 4-6, 7-9, or 10-12"),
+    rough_narrative: str = Form(
+        default="",
+        description=(
+            "Optional: the child's rough story idea in their own words. "
+            "When provided, the AI rewrites it in storybook style instead of inventing "
+            "a story from the image caption.  Max 2000 characters.  "
+            "Never stored raw — SHA-256 hash only in audit log."
+        ),
+    ),
     _token: TokenPayload = require_role("parent"),
 ) -> Any:
     """
     Validate the uploaded drawing and enqueue a Celery comic-generation job.
+
+    When ``rough_narrative`` is supplied the story-generation node rewrites the
+    child's own words into polished storybook panels instead of generating a
+    story purely from the image caption.
 
     Returns
     -------
@@ -228,7 +241,12 @@ async def generate_comic(
 
     from app.tasks import generate_comic as celery_generate_comic
 
-    celery_generate_comic.delay(job_id, image_bytes_b64, child_name, style, age_group)
+    # Sanitise narrative: strip, cap at 2000 chars, never log raw content.
+    safe_narrative = rough_narrative.strip()[:2000]
+
+    celery_generate_comic.delay(
+        job_id, image_bytes_b64, child_name, style, age_group, safe_narrative
+    )
 
     jobs_total.labels(status="queued").inc()
     queue_depth_gauge.inc()

@@ -126,6 +126,55 @@ def _register(name: str, model: mlflow.pyfunc.PythonModel, alias: str = "Product
 # Main
 # ---------------------------------------------------------------------------
 
+class _StubPanelImageGen(mlflow.pyfunc.PythonModel):
+    """
+    Development stub for panel_image_gen.
+
+    Delegates to the PIL panel_artist (pencil-sketch + mood tint) which is
+    always available without an API key.  In production replace this with a
+    real Stability AI or HF Inference backend by setting:
+        PANEL_IMG_GEN_BACKEND=stability
+        STABILITY_API_KEY=<key>
+    """
+
+    def predict(self, context, model_input, params=None):  # noqa: ARG002
+        import base64, io  # noqa: PLC0415, E401
+        from PIL import Image  # noqa: PLC0415
+
+        if isinstance(model_input, pd.DataFrame):
+            row = model_input.to_dict(orient="records")[0]
+        elif isinstance(model_input, dict):
+            row = model_input
+        else:
+            row = list(model_input)[0]
+
+        seed_b64 = str(row.get("seed_image_b64", ""))
+        narration = str(row.get("narration", "a colourful scene"))
+        panel_num = int(row.get("panel_num", 0))
+        style = str(row.get("style", "adventure"))
+
+        # If no seed, produce a tiny placeholder so the pipeline keeps moving.
+        if not seed_b64:
+            placeholder = Image.new("RGB", (400, 300), (220, 220, 220))
+            buf = io.BytesIO()
+            placeholder.save(buf, format="JPEG")
+            return {"image_b64": base64.b64encode(buf.getvalue()).decode()}
+
+        # Delegate to the PIL panel_artist (available without any API key).
+        try:
+            import sys, os  # noqa: PLC0415, E401
+            sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            from agent.panel_artist import draw_panel_image  # noqa: PLC0415
+            image_b64 = draw_panel_image(seed_b64, narration, panel_num, style)
+        except Exception:  # noqa: BLE001
+            placeholder = Image.new("RGB", (400, 300), (200, 200, 220))
+            buf = io.BytesIO()
+            placeholder.save(buf, format="JPEG")
+            image_b64 = base64.b64encode(buf.getvalue()).decode()
+
+        return {"image_b64": image_b64}
+
+
 if __name__ == "__main__":
     print(f"MLflow tracking URI: {MLFLOW_URI}")
     print("Seeding stub models …")
@@ -133,6 +182,7 @@ if __name__ == "__main__":
     try:
         _register("captioner", _StubCaptioner())
         _register("storyteller", _StubStoryteller())
+        _register("panel_image_gen", _StubPanelImageGen())
     except Exception as exc:
         print(f"\n✗ Seeding failed: {exc}", file=sys.stderr)
         sys.exit(1)

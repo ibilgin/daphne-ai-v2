@@ -16,6 +16,7 @@ storyteller = get_storyteller()
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any
 
@@ -27,11 +28,48 @@ logger = logging.getLogger(__name__)
 
 _captioner: Any = None
 _storyteller: Any = None
+_panel_image_gen: Any = None
+
+
+class _DirectPanelImageGen:
+    """
+    Wraps PanelImageGenModel to match the mlflow.pyfunc.PyFuncModel.predict(data)
+    interface so the generate_panel_images node can call it the same way.
+
+    Used when MLflow/MinIO is unavailable (e.g. running FastAPI directly on Mac)
+    but PANEL_IMG_GEN_BACKEND is set to a non-PIL backend such as local_diffusers.
+    """
+
+    def __init__(self) -> None:
+        from models.panel_image_gen import PanelImageGenModel  # noqa: PLC0415
+
+        self._impl = PanelImageGenModel()
+
+    def predict(self, data: Any, params: Any = None) -> Any:
+        return self._impl.predict(None, data)
+
+
+def _inject_minio_credentials() -> None:
+    """
+    Push MinIO credentials from Settings into os.environ so boto3 finds them.
+
+    pydantic-settings reads .env into the Settings object but does NOT write
+    values back to os.environ.  boto3 (used by MLflow's S3 artifact store) reads
+    os.environ directly, so the bridge must be explicit.
+
+    Uses setdefault so that values already in the real environment take priority.
+    """
+    settings = get_settings()
+    if settings.minio_access_key:
+        os.environ.setdefault("AWS_ACCESS_KEY_ID", settings.minio_access_key)
+        os.environ.setdefault("AWS_SECRET_ACCESS_KEY", settings.minio_secret_key)
+        os.environ.setdefault("MLFLOW_S3_ENDPOINT_URL", settings.minio_endpoint_url)
 
 
 def _load_with_retry(model_name: str, alias: str, max_retries: int = 3) -> Any:
     """Load an MLflow pyfunc model by registered-model alias, retrying on failure."""
     settings = get_settings()
+    _inject_minio_credentials()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
 
     uri = f"models:/{model_name}@{alias}"
@@ -65,13 +103,41 @@ def _load_with_retry(model_name: str, alias: str, max_retries: int = 3) -> Any:
 
 
 def load_all_models() -> None:
-    """Load both models into module-level singletons.  Call once at startup."""
-    global _captioner, _storyteller
+    """Load all models into module-level singletons.  Call once at startup."""
+    global _captioner, _storyteller, _panel_image_gen
     settings = get_settings()
     alias = settings.model_alias
 
     _captioner = _load_with_retry(settings.captioner_model_name, alias)
     _storyteller = _load_with_retry(settings.storyteller_model_name, alias)
+
+    # panel_image_gen is optional — skip gracefully if not yet registered.
+    try:
+        _panel_image_gen = _load_with_retry("panel_image_gen", alias, max_retries=1)
+    except Exception as exc:  # noqa: BLE001
+        backend = os.environ.get("PANEL_IMG_GEN_BACKEND", "pil").lower()
+        if backend != "pil":
+            # A generative backend is requested but MLflow is unavailable (e.g.
+            # running FastAPI directly on Mac without Docker).  Instantiate
+            # PanelImageGenModel directly so the backend env var is honoured.
+            try:
+                _panel_image_gen = _DirectPanelImageGen()
+                logger.info(
+                    "model_loader: MLflow unavailable (%s) — using PanelImageGenModel "
+                    "directly (backend=%s)",
+                    exc, backend,
+                )
+            except Exception as inner:  # noqa: BLE001
+                logger.warning("model_loader: PanelImageGenModel direct init failed — %s", inner)
+                _panel_image_gen = None
+        else:
+            logger.warning(
+                "model_loader: panel_image_gen not found in registry (%s) — "
+                "PIL fallback will be used. Run `make seed` to register the stub.",
+                exc,
+            )
+            _panel_image_gen = None
+
     logger.info("model_loader: all models ready")
 
 
@@ -89,3 +155,16 @@ def get_storyteller() -> Any:
     if _storyteller is None:
         load_all_models()
     return _storyteller
+
+
+def get_panel_image_gen() -> Any | None:
+    """
+    Return the panel_image_gen singleton, or None if not registered.
+
+    The generate_panel_images node calls this and falls back to the PIL
+    panel_artist when None is returned (e.g. during first-run before seeding).
+    """
+    global _panel_image_gen, _captioner
+    if _captioner is None:
+        load_all_models()
+    return _panel_image_gen

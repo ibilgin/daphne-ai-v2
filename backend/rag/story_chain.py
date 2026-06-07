@@ -43,6 +43,19 @@ _SYSTEM_PROMPT = (
     '{{"panels": [{{"panel": 1, "narration": "...", "dialogue": "..."}}, ...]}}'
 )
 
+_SYSTEM_PROMPT_REWRITE = (
+    "You are a warm and imaginative children's book author. "
+    "A child has shared a rough story idea. Your job is to bring their vision to life "
+    "as exactly {panel_count} comic book panels, keeping their characters and ideas "
+    "but writing in vivid, age-appropriate storybook language. "
+    "Each panel must cover a distinct moment and have 'narration' (2-3 descriptive "
+    "sentences) and 'dialogue' (a short character quote, or null if none). "
+    "Preserve the child's imagination — do not replace their ideas, only enrich them. "
+    "Keep all content child-friendly. "
+    "Respond ONLY with a JSON object in this exact format: "
+    '{{"panels": [{{"panel": 1, "narration": "...", "dialogue": "..."}}, ...]}}'
+)
+
 
 def _build_user_prompt(
     caption: str,
@@ -51,7 +64,7 @@ def _build_user_prompt(
     panel_count: int,
     safety_failure_reason: str | None = None,
 ) -> str:
-    """Construct the user-facing prompt."""
+    """Construct the user-facing prompt for caption-based generation."""
     lines = [
         f"Child's name: {child_name}",
         f"Image caption: {caption}",
@@ -66,6 +79,28 @@ def _build_user_prompt(
             f"\nIMPORTANT: A previous version of this story was rejected because it "
             f"contained inappropriate content: {safety_failure_reason}. "
             "Please rewrite the story to be completely age-appropriate and positive."
+        )
+    return "\n".join(lines)
+
+
+def _build_rewrite_prompt(
+    rough_narrative: str,
+    caption: str,
+    child_name: str,
+    panel_count: int,
+    safety_failure_reason: str | None = None,
+) -> str:
+    """Construct the user-facing prompt for narrative rewriting."""
+    lines = [
+        f"Child's name: {child_name}",
+        f"Image caption (for visual context): {caption}",
+        f"Number of panels: {panel_count}",
+        f"\nChild's rough story idea:\n{rough_narrative.strip()}",
+    ]
+    if safety_failure_reason:
+        lines.append(
+            f"\nIMPORTANT: A previous version was rejected: {safety_failure_reason}. "
+            "Rewrite to be completely age-appropriate and positive."
         )
     return "\n".join(lines)
 
@@ -102,6 +137,7 @@ def generate_panels(
     child_name: str,
     panel_count: int = 4,
     safety_failure_reason: str | None = None,
+    rough_narrative: str = "",
 ) -> list[dict]:
     """
     Generate comic panels via the LangChain → Ollama Mistral pipeline.
@@ -119,6 +155,9 @@ def generate_panels(
     safety_failure_reason : str | None
         If this is a retry after a safety failure, include the reason so the
         model can avoid repeating the problematic content.
+    rough_narrative : str
+        Optional child-authored story idea.  When non-empty the model rewrites
+        it into storybook panels instead of generating from the caption alone.
 
     Returns
     -------
@@ -135,10 +174,20 @@ def generate_panels(
     ollama_url = os.environ.get("OLLAMA_BASE_URL", _DEFAULT_OLLAMA_URL)
     model_name = os.environ.get("OLLAMA_MODEL", _DEFAULT_MODEL)
 
-    system_prompt = _SYSTEM_PROMPT.format(panel_count=panel_count)
-    user_prompt = _build_user_prompt(
-        caption, style_examples, child_name, panel_count, safety_failure_reason
-    )
+    if rough_narrative.strip():
+        # Narrative-rewriting path: the child provided a story idea.
+        system_prompt = _SYSTEM_PROMPT_REWRITE.format(panel_count=panel_count)
+        user_prompt = _build_rewrite_prompt(
+            rough_narrative, caption, child_name, panel_count, safety_failure_reason
+        )
+        logger.info("story_chain: using narrative-rewrite path (rough_narrative provided)")
+    else:
+        # Caption-based path: generate a story from the image description.
+        system_prompt = _SYSTEM_PROMPT.format(panel_count=panel_count)
+        user_prompt = _build_user_prompt(
+            caption, style_examples, child_name, panel_count, safety_failure_reason
+        )
+
     # Combine into a single prompt — Ollama LLM takes a plain string
     full_prompt = f"{system_prompt}\n\n{user_prompt}"
 

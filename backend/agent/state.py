@@ -9,6 +9,8 @@ updates are permitted inside nodes.
 Field notes
 -----------
 image_bytes       : base64-encoded drawing bytes.  Never written to disk or DB.
+rough_narrative   : optional child-authored story idea passed from the API.
+                    Empty string ("") when not provided.  Never persisted.
 safety_verdict    : "PASS" | "FAIL" | None (None until check_safety runs).
 retry_count       : incremented BEFORE re-entering generate_panels on FAIL.
 final_comic       : serialised ComicSchema dict, set by assemble node.
@@ -31,6 +33,7 @@ class ComicState(TypedDict):
     child_name: str
     age_group: str          # "4-6" | "7-9" | "10-12"
     style_pref: str         # user-selected style preference hint
+    rough_narrative: str    # optional child-authored story idea; "" when not provided
 
     # Pipeline intermediate values
     caption: Optional[str]
